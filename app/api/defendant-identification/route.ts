@@ -1,12 +1,57 @@
 import { z } from "zod";
 import {
+  type DefendantCandidate,
   formatDefendantReport,
   getDefendantAgent,
 } from "@/lib/agents/defendant-agent";
+import type { SosEntity, SosLookupResult } from "@/lib/agents/defendant-tools";
 import { createLogger, nextRequestId } from "@/lib/logger";
 import { isRateLimitError } from "@/lib/rate-limit";
 
 const baseLog = createLogger("defendant-id");
+
+// Legal-entity suffixes to ignore when matching a Secretary of State record to
+// an identified candidate (so "Sunshine Marketing, LLC" matches "Sunshine
+// Marketing Inc").
+const NAME_SUFFIXES = new Set([
+  "LLC",
+  "INC",
+  "CORP",
+  "CO",
+  "PA",
+  "PC",
+  "PLLC",
+  "LP",
+  "LLP",
+  "LLLP",
+  "LTD",
+  "COMPANY",
+  "CORPORATION",
+  "INCORPORATED",
+]);
+
+function normalizeName(name: string): string {
+  return name
+    .toUpperCase()
+    .replace(/[^A-Z0-9 ]/g, " ")
+    .split(/\s+/)
+    .filter((token) => token && !NAME_SUFFIXES.has(token))
+    .join(" ");
+}
+
+function namesMatch(a: string, b: string): boolean {
+  const na = normalizeName(a);
+  const nb = normalizeName(b);
+  if (!na || !nb) return false;
+  return na === nb || na.includes(nb) || nb.includes(na);
+}
+
+/** Prefer Active / Good Standing records when the same entity is found twice. */
+function isActive(entity: SosEntity): boolean {
+  return /active|good standing/i.test(entity.status ?? "");
+}
+
+type CandidateWithSos = DefendantCandidate & { sos: SosEntity | null };
 
 const fileSchema = z.object({
   kind: z.enum(["audio", "image"]),
@@ -82,7 +127,72 @@ export async function POST(request: Request) {
       companies: candidates.map((c) => c.company_name).join(" | ") || "(none)",
     });
 
-    return Response.json(report);
+    // Phase 3 — attach the authoritative Secretary of State records. These come
+    // straight from the `sos_lookup` tool outputs (NOT the LLM), so the legal
+    // name, addresses, and registered agent are byte-exact for filing/service.
+    // `result.staticToolResults` only holds the final step; the lookup happens
+    // mid-loop, so aggregate tool results across every step.
+    const sosResults = (result.steps ?? [])
+      .flatMap((step) => step.staticToolResults ?? [])
+      .filter((r) => r.toolName === "sos_lookup")
+      .map((r) => r.output as SosLookupResult);
+
+    const foundEntities: SosEntity[] = [];
+    for (const r of sosResults) {
+      if (!r.found) continue;
+      // Dedupe across state retries; keep the Active record on a tie.
+      const dupeIndex = foundEntities.findIndex(
+        (e) =>
+          (e.entityId && r.entity.entityId && e.entityId === r.entity.entityId) ||
+          (!!e.entityName &&
+            !!r.entity.entityName &&
+            namesMatch(e.entityName, r.entity.entityName)),
+      );
+      if (dupeIndex === -1) foundEntities.push(r.entity);
+      else if (isActive(r.entity) && !isActive(foundEntities[dupeIndex])) {
+        foundEntities[dupeIndex] = r.entity;
+      }
+    }
+
+    const sosErrors = sosResults
+      .filter((r): r is Extract<SosLookupResult, { error: string }> =>
+        "error" in r,
+      )
+      .map((r) => r.error);
+
+    // Attach each entity to its best-matching candidate; surface the rest.
+    const usedEntities = new Set<SosEntity>();
+    const candidatesWithSos: CandidateWithSos[] = candidates.map((candidate) => {
+      const match = foundEntities.find(
+        (e) =>
+          !usedEntities.has(e) &&
+          !!e.entityName &&
+          namesMatch(candidate.company_name, e.entityName),
+      );
+      if (match) usedEntities.add(match);
+      return { ...candidate, sos: match ?? null };
+    });
+    const unmatchedEntities = foundEntities.filter((e) => !usedEntities.has(e));
+
+    log.info("sos lookups summarized", {
+      attempts: sosResults.length,
+      found: foundEntities.length,
+      attached: foundEntities.length - unmatchedEntities.length,
+      errors: sosErrors.length,
+    });
+
+    return Response.json({
+      candidates: candidatesWithSos,
+      search_terms_used: report.search_terms_used ?? [],
+      sos_records: foundEntities,
+      unmatched_sos_records: unmatchedEntities,
+      // Surface SOS trouble only when nothing came back, so a single bad
+      // state guess alongside a good hit doesn't raise a false alarm.
+      sos_error:
+        foundEntities.length === 0 && sosErrors.length > 0
+          ? sosErrors[0]
+          : undefined,
+    });
   } catch (err) {
     if (isRateLimitError(err)) {
       log.error("failed: gateway rate limit exceeded (429)");

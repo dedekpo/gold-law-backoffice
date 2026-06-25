@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { Output, ToolLoopAgent, generateText, stepCountIs } from "ai";
 import { z } from "zod";
 import { MODELS } from "@/lib/provider";
-import { fetchPageTool, webSearchTool } from "./defendant-tools";
+import { fetchPageTool, sosLookupTool, webSearchTool } from "./defendant-tools";
 import { rateLimitedModel } from "./model";
 
 export const candidateSchema = z.object({
@@ -72,17 +72,27 @@ problem in a loop:
    company, not an unrelated business.
 4. Resolve short links (bit.ly etc.) with fetch_page before trusting them.
 5. Estimate solvability: search "<company> employees linkedin" and "<company> revenue".
-
-SCOPE FOR THIS VERSION: identify the entity and estimate solvability. You do NOT need to complete
-the Secretary of State / registered-agent lookup or send any "HELP" texts — if a registry lookup
-or human outreach is the obvious next step, note it in the candidate's \`notes\` instead.
+6. CONFIRM the entity in the official record with the \`sos_lookup\` tool. Once you have a
+   candidate legal name, look it up in the Secretary of State registry to obtain the
+   authoritative legal name, state of formation, principal and mailing addresses, and the
+   registered agent's name and address — this is what the firm needs to file and serve.
+   - Search NATIONWIDE, not one fixed state. Pass the entity's most likely state of
+     registration first: the state in its principal/contact address, the state named in its
+     Terms ("a California corporation"), or 'DE' for many incorporated businesses.
+   - If the first state returns no match, retry with other plausible 2-letter state codes
+     (a not-found result is free). Prefer an entity whose status is Active/Good Standing and
+     whose address/officers corroborate your other evidence.
+   - Always run \`sos_lookup\` before finishing if you have any plausible legal name — the
+     official record is the most valuable output of this investigation.
 
 When you have finished investigating, write a concise FINAL REPORT in plain text. For EACH distinct
-company you can support with evidence, state: the company / legal name; website; the goods or services
-it sells; state of incorporation (if found); an employee-count estimate and a revenue estimate (if
-found); your solvability rating (risk / good / whale / unknown); your confidence from 0 to 1; the
-source URLs you relied on; and any notable next steps. If you genuinely cannot identify any company,
-say so plainly — do not invent one.
+company you can support with evidence, state: the company / legal name (use the exact legal name from
+the Secretary of State record when you found one); website; the goods or services it sells; state of
+incorporation (prefer the official state of formation from \`sos_lookup\`); an employee-count estimate
+and a revenue estimate (if found); your solvability rating (risk / good / whale / unknown); your
+confidence from 0 to 1; the source URLs you relied on; and any notable next steps. Note in the report
+which state's registry confirmed the entity. If you genuinely cannot identify any company, say so
+plainly — do not invent one.
 
 --- SOP (source of truth) ---
 `;
@@ -95,7 +105,11 @@ report, use null (or an empty array for sources). If the report identifies no co
 
 let cachedAgent: Promise<ToolLoopAgent<never, typeof tools>> | undefined;
 
-const tools = { web_search: webSearchTool, fetch_page: fetchPageTool };
+const tools = {
+  web_search: webSearchTool,
+  fetch_page: fetchPageTool,
+  sos_lookup: sosLookupTool,
+};
 
 async function loadSop(): Promise<string> {
   return readFile(

@@ -34,6 +34,40 @@ type Evaluation = {
   reasoning: string;
 };
 
+// Official Secretary of State record (from OpenSOSData via the agent). Every
+// field is optional because coverage varies by state; extra fields a state
+// returns are preserved via the index signature and shown under "Additional
+// details" so nothing in the enrichment is lost.
+type SosEntity = {
+  entityName?: string | null;
+  entityType?: string | null;
+  entityId?: string | null;
+  status?: string | null;
+  formationDate?: string | null;
+  registeredAgentName?: string | null;
+  registeredAgentAddress?: string | null;
+  registeredAgentCity?: string | null;
+  registeredAgentState?: string | null;
+  registeredAgentZip?: string | null;
+  principalAddress?: string | null;
+  principalCity?: string | null;
+  principalState?: string | null;
+  principalZip?: string | null;
+  mailingAddress?: string | null;
+  mailingCity?: string | null;
+  mailingState?: string | null;
+  mailingZip?: string | null;
+  officers?:
+    | Array<{ name?: string | null; title?: string | null; address?: string | null }>
+    | null;
+  jurisdiction?: string | null;
+  searchState?: string | null;
+  feiEinNumber?: string | null;
+  sosUrl?: string | null;
+  scrapedAt?: string | null;
+  [key: string]: unknown;
+};
+
 type DefendantCandidate = {
   company_name: string;
   website: string | null;
@@ -45,11 +79,15 @@ type DefendantCandidate = {
   confidence: number;
   sources: string[];
   notes: string | null;
+  sos?: SosEntity | null;
 };
 
 type DefendantReport = {
   candidates: DefendantCandidate[];
   search_terms_used: string[];
+  sos_records?: SosEntity[];
+  unmatched_sos_records?: SosEntity[];
+  sos_error?: string;
 };
 
 type Case = {
@@ -62,6 +100,8 @@ type Case = {
   defendantStatus: DefendantStatus;
   defendants?: DefendantCandidate[];
   defendantError?: string;
+  defendantSosError?: string;
+  defendantUnmatchedSos?: SosEntity[];
 };
 
 const PREFERRED_MIME_TYPES = [
@@ -352,6 +392,8 @@ export default function Home() {
                 ...entry,
                 defendantStatus: "done",
                 defendants: report.candidates,
+                defendantSosError: report.sos_error,
+                defendantUnmatchedSos: report.unmatched_sos_records,
               }
             : entry,
         ),
@@ -878,6 +920,13 @@ function DefendantDropdown({ cases }: { cases: Case[] }) {
 
   const identifying = cases.some((c) => c.defendantStatus === "identifying");
   const anyDone = cases.some((c) => c.defendantStatus === "done");
+  const errors = cases
+    .filter((c) => c.defendantStatus === "error")
+    .map((c) => ({ name: c.name, message: c.defendantError ?? "Unknown error" }));
+  const sosErrors = cases
+    .map((c) => c.defendantSosError)
+    .filter((m): m is string => Boolean(m));
+  const unmatched = cases.flatMap((c) => c.defendantUnmatchedSos ?? []);
 
   const selectedEntry =
     candidates.find(
@@ -901,12 +950,14 @@ function DefendantDropdown({ cases }: { cases: Case[] }) {
               </span>
               <span className="text-xs text-zinc-500 dark:text-zinc-400">
                 {identifying
-                  ? "Investigating…"
+                  ? "Investigating & checking Secretary of State records…"
                   : candidates.length > 0
                     ? `${candidates.length} candidate${candidates.length === 1 ? "" : "s"} found`
-                    : anyDone
-                      ? "No companies identified"
-                      : "Waiting for evaluation…"}
+                    : errors.length > 0
+                      ? "Identification failed"
+                      : anyDone
+                        ? "No companies identified"
+                        : "Waiting for evaluation…"}
               </span>
             </div>
           </div>
@@ -919,11 +970,27 @@ function DefendantDropdown({ cases }: { cases: Case[] }) {
 
         {open && (
           <div className="border-t border-zinc-200 dark:border-zinc-800">
+            {errors.length > 0 && (
+              <div className="border-b border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300">
+                {errors.map((e) => (
+                  <p key={e.name}>
+                    <span className="font-medium">{e.name}:</span> {e.message}
+                  </p>
+                ))}
+              </div>
+            )}
+            {sosErrors.length > 0 && (
+              <div className="border-b border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200">
+                Secretary of State lookup did not complete: {sosErrors[0]}
+              </div>
+            )}
             {candidates.length === 0 ? (
               <p className="p-4 text-sm text-zinc-500 dark:text-zinc-400">
                 {identifying
-                  ? "The agent is searching the web for the company behind this case…"
-                  : "No companies have been identified yet."}
+                  ? "The agent is searching the web and the Secretary of State registries for the company behind this case…"
+                  : errors.length > 0
+                    ? "Identification could not be completed — see the error above."
+                    : "No companies have been identified yet."}
               </p>
             ) : (
               <ul className="divide-y divide-zinc-200 dark:divide-zinc-800">
@@ -938,8 +1005,13 @@ function DefendantDropdown({ cases }: { cases: Case[] }) {
                         className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-900"
                       >
                         <div className="flex flex-col">
-                          <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                          <span className="flex items-center gap-2 text-sm font-medium text-zinc-900 dark:text-zinc-100">
                             {entry.candidate.company_name}
+                            {entry.candidate.sos && (
+                              <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200">
+                                SOS verified
+                              </span>
+                            )}
                           </span>
                           <span className="text-xs text-zinc-500 dark:text-zinc-400">
                             {entry.candidate.goods_services ?? "—"} ·{" "}
@@ -957,6 +1029,21 @@ function DefendantDropdown({ cases }: { cases: Case[] }) {
                   );
                 })}
               </ul>
+            )}
+            {unmatched.length > 0 && (
+              <div className="border-t border-zinc-200 p-4 dark:border-zinc-800">
+                <p className="mb-2 text-[10px] uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                  Additional official records found
+                </p>
+                <div className="flex flex-col gap-3">
+                  {unmatched.map((entity, i) => (
+                    <SosRecordPanel
+                      key={`${entity.entityId ?? entity.entityName ?? "rec"}-${i}`}
+                      sos={entity}
+                    />
+                  ))}
+                </div>
+              </div>
             )}
           </div>
         )}
@@ -1001,6 +1088,19 @@ function CandidateDetail({ entry }: { entry: AggregatedCandidate }) {
         ))}
       </dl>
 
+      <div className="mt-4 border-t border-zinc-200 pt-4 dark:border-zinc-800">
+        <p className="mb-2 text-[10px] uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+          Official record (Secretary of State)
+        </p>
+        {c.sos ? (
+          <SosRecordPanel sos={c.sos} />
+        ) : (
+          <p className="text-sm text-zinc-500 dark:text-zinc-400">
+            No matching Secretary of State record was found for this entity.
+          </p>
+        )}
+      </div>
+
       {c.notes && (
         <p className="mt-3 border-t border-zinc-200 pt-3 text-sm text-zinc-700 dark:border-zinc-800 dark:text-zinc-300">
           {c.notes}
@@ -1026,6 +1126,164 @@ function CandidateDetail({ entry }: { entry: AggregatedCandidate }) {
               </li>
             ))}
           </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Fields rendered explicitly (or composed into an address) below — excluded
+// from the generic "Additional details" dump so they aren't shown twice.
+const SOS_CURATED_KEYS = new Set([
+  "entityName",
+  "status",
+  "entityType",
+  "formationDate",
+  "jurisdiction",
+  "searchState",
+  "registeredAgentName",
+  "registeredAgentAddress",
+  "registeredAgentCity",
+  "registeredAgentState",
+  "registeredAgentZip",
+  "registeredAgentMailingAddress",
+  "principalAddress",
+  "principalCity",
+  "principalState",
+  "principalZip",
+  "mailingAddress",
+  "mailingCity",
+  "mailingState",
+  "mailingZip",
+  "officers",
+  "sosUrl",
+  "feiEinNumber",
+  "scrapedAt",
+  "screenshots",
+]);
+
+function joinAddress(
+  parts: Array<string | null | undefined>,
+): string | null {
+  const cleaned = parts.map((p) => (p ?? "").trim()).filter(Boolean);
+  return cleaned.length ? cleaned.join(", ") : null;
+}
+
+function humanizeKey(key: string): string {
+  return key
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/[_-]+/g, " ")
+    .replace(/^./, (c) => c.toUpperCase());
+}
+
+/** Renders an authoritative Secretary of State entity record in full. */
+function SosRecordPanel({ sos }: { sos: SosEntity }) {
+  const principal = joinAddress([
+    sos.principalAddress,
+    sos.principalCity,
+    sos.principalState,
+    sos.principalZip,
+  ]);
+  const mailing = joinAddress([
+    sos.mailingAddress,
+    sos.mailingCity,
+    sos.mailingState,
+    sos.mailingZip,
+  ]);
+  const agentAddress = joinAddress([
+    sos.registeredAgentAddress,
+    sos.registeredAgentCity,
+    sos.registeredAgentState,
+    sos.registeredAgentZip,
+  ]);
+
+  const rows: [string, string | null | undefined][] = [
+    ["Legal name", sos.entityName],
+    ["Status", sos.status],
+    ["Entity type", sos.entityType],
+    ["State of formation", sos.jurisdiction ?? sos.searchState],
+    ["Registry searched", sos.searchState],
+    ["Formation date", sos.formationDate],
+    ["FEI / EIN", sos.feiEinNumber],
+    ["Principal address", principal],
+    ["Mailing address", mailing],
+    ["Registered agent", sos.registeredAgentName],
+    ["Agent address", agentAddress],
+  ];
+
+  // Any remaining scalar fields the state returned, so nothing is lost.
+  const extras = Object.entries(sos).filter(
+    ([key, value]) =>
+      !SOS_CURATED_KEYS.has(key) &&
+      (typeof value === "string" || typeof value === "number") &&
+      String(value).trim() !== "",
+  );
+
+  return (
+    <div className="rounded-lg border border-emerald-200 bg-emerald-50/60 p-4 dark:border-emerald-900/60 dark:bg-emerald-950/30">
+      <dl className="grid grid-cols-[10rem_1fr] gap-x-4 gap-y-2 text-sm">
+        {rows.map(([label, value]) => (
+          <Fragment key={label}>
+            <dt className="text-zinc-500 dark:text-zinc-400">{label}</dt>
+            <dd className="break-words text-zinc-900 dark:text-zinc-100">
+              {value ?? "—"}
+            </dd>
+          </Fragment>
+        ))}
+      </dl>
+
+      {sos.officers && sos.officers.length > 0 && (
+        <div className="mt-3 border-t border-emerald-200 pt-3 dark:border-emerald-900/60">
+          <p className="text-[10px] uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+            Officers / Directors
+          </p>
+          <ul className="mt-1 flex flex-col gap-1 text-sm text-zinc-800 dark:text-zinc-200">
+            {sos.officers.map((officer, i) => (
+              <li key={`${officer.name ?? "officer"}-${i}`}>
+                {[officer.title, officer.name].filter(Boolean).join(" — ") ||
+                  "—"}
+                {officer.address ? (
+                  <span className="text-zinc-500 dark:text-zinc-400">
+                    {" "}
+                    · {officer.address}
+                  </span>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {extras.length > 0 && (
+        <div className="mt-3 border-t border-emerald-200 pt-3 dark:border-emerald-900/60">
+          <p className="text-[10px] uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+            Additional details
+          </p>
+          <dl className="mt-1 grid grid-cols-[10rem_1fr] gap-x-4 gap-y-1 text-sm">
+            {extras.map(([key, value]) => (
+              <Fragment key={key}>
+                <dt className="text-zinc-500 dark:text-zinc-400">
+                  {humanizeKey(key)}
+                </dt>
+                <dd className="break-words text-zinc-800 dark:text-zinc-200">
+                  {String(value)}
+                </dd>
+              </Fragment>
+            ))}
+          </dl>
+        </div>
+      )}
+
+      {sos.sosUrl && (
+        <div className="mt-3 border-t border-emerald-200 pt-3 dark:border-emerald-900/60">
+          <a
+            href={sos.sosUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="break-all text-xs text-blue-600 underline dark:text-blue-400"
+          >
+            View official filing ↗
+          </a>
         </div>
       )}
     </div>

@@ -131,3 +131,292 @@ export const fetchPageTool = tool({
     }
   },
 });
+
+// --- OpenSOSData: real-time Secretary of State entity lookups -----------------
+
+const OPEN_SOS_BASE_URL = "https://api.opensosdata.com";
+const SOS_REQUEST_TIMEOUT_MS = 30_000;
+// Slow states return 202 + a jobId; we poll the status endpoint until it
+// resolves. Keep the total well under the route's 300s budget.
+const SOS_POLL_INTERVAL_MS = 3_000;
+const SOS_MAX_POLL_MS = 150_000;
+
+/**
+ * A Secretary of State entity record. Mirrors OpenSOSData's `EntityData` shape;
+ * every field is optional because coverage varies by state. The index signature
+ * preserves any extra fields a state returns so nothing is dropped from the
+ * enrichment — but `screenshots` (heavy source-verification blobs) is stripped
+ * before this reaches the agent or the client.
+ */
+export interface SosEntity {
+  entityName?: string | null;
+  entityType?: string | null;
+  entityId?: string | null;
+  status?: string | null;
+  formationDate?: string | null;
+  registeredAgentName?: string | null;
+  registeredAgentAddress?: string | null;
+  registeredAgentCity?: string | null;
+  registeredAgentState?: string | null;
+  registeredAgentZip?: string | null;
+  principalAddress?: string | null;
+  principalCity?: string | null;
+  principalState?: string | null;
+  principalZip?: string | null;
+  mailingAddress?: string | null;
+  mailingCity?: string | null;
+  mailingState?: string | null;
+  mailingZip?: string | null;
+  officers?: Array<{ name?: string | null; title?: string | null; address?: string | null }> | null;
+  jurisdiction?: string | null;
+  /** The state we searched; injected by the lookup tool, not the API. */
+  searchState?: string | null;
+  feiEinNumber?: string | null;
+  sosUrl?: string | null;
+  scrapedAt?: string | null;
+  [key: string]: unknown;
+}
+
+/** Result of one `sos_lookup` call, as the agent (and route) see it. */
+export type SosLookupResult =
+  | { found: true; state: string; queriedName: string; entity: SosEntity }
+  | { found: false; state: string; queriedName: string; message: string }
+  | { found: false; state: string; queriedName: string; error: string };
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// Heavy / noisy fields we never need downstream (source-verification image
+// blobs and links, the related-results list, and cache bookkeeping). Dropped so
+// they don't bloat the agent's context or the enrichment shown to the user.
+const SOS_DROP_FIELDS = [
+  "screenshots",
+  "searchScreenshotPath",
+  "detailScreenshotPath",
+  "filingHistoryScreenshotPath",
+  "searchResultsScreenshotUrl",
+  "detailScreenshotUrl",
+  "filingHistoryScreenshotUrl",
+  "relatedResults",
+  "cached",
+  "cacheExpiresAt",
+] as const;
+
+/** Pull the entity object out of a 200 body or a completed-job body. */
+function extractEntity(payload: unknown, searchState: string): SosEntity | null {
+  if (!payload || typeof payload !== "object") return null;
+  const p = payload as { data?: unknown; result?: { data?: unknown } };
+  const data = p.data ?? p.result?.data;
+  if (!data || typeof data !== "object") return null;
+  const entity = { ...(data as SosEntity) };
+  for (const field of SOS_DROP_FIELDS) delete entity[field];
+  // Record which registry confirmed the entity. For a domestic entity the API
+  // leaves `jurisdiction` (state of formation) blank, so it defaults to the
+  // state we searched; foreign entities keep their real home jurisdiction.
+  entity.searchState = searchState;
+  return entity;
+}
+
+type PollOutcome =
+  | { kind: "found"; entity: SosEntity }
+  | { kind: "not_found" }
+  | { kind: "error"; error: string };
+
+/**
+ * Poll an async lookup job until it completes, fails, or we run out of time.
+ * Returns a tagged outcome describing how it resolved.
+ */
+async function pollSosJob(
+  jobId: string,
+  apiKey: string,
+  pollInterval: number,
+  searchState: string,
+): Promise<PollOutcome> {
+  const deadline = Date.now() + SOS_MAX_POLL_MS;
+  while (Date.now() < deadline) {
+    await sleep(pollInterval);
+    const res = await fetch(`${OPEN_SOS_BASE_URL}/v1/lookup/status/${jobId}`, {
+      headers: { "x-api-key": apiKey },
+      signal: AbortSignal.timeout(SOS_REQUEST_TIMEOUT_MS),
+    });
+    if (res.status === 404) return { kind: "not_found" };
+    const json = (await res.json().catch(() => ({}))) as {
+      status?: string;
+      error?: string;
+    };
+    if (json.status === "complete") {
+      const entity = extractEntity(json, searchState);
+      return entity
+        ? { kind: "found", entity }
+        : { kind: "error", error: "Lookup completed but returned no entity data." };
+    }
+    if (json.status === "failed") {
+      return { kind: "error", error: json.error || "State scraper failed." };
+    }
+    // pending / processing → keep polling
+  }
+  return { kind: "error", error: "Secretary of State lookup timed out." };
+}
+
+/**
+ * Look up a business entity in a state's Secretary of State registry via
+ * OpenSOSData. This is the authoritative source for the data the legal team
+ * needs to file: the registered legal name, state of formation, principal and
+ * mailing addresses, and — critically — the registered agent name and address.
+ *
+ * Handles the API's async (202 + poll) path transparently, so a single call
+ * either returns the entity, a not-found, or an error string. Failures are
+ * returned (not thrown) so a bad state guess doesn't abort the whole agent run.
+ */
+export const sosLookupTool = tool({
+  description:
+    "Look up a business in a US state's official Secretary of State registry. This is " +
+    "the AUTHORITATIVE source for the registered legal name, state of formation, " +
+    "principal/mailing addresses, and the registered agent name + address (what the firm " +
+    "needs to serve a lawsuit). Search NATIONWIDE: pass the entity's most likely state of " +
+    "registration (e.g. the state in its address or named in its Terms, or 'DE' for many " +
+    "corporations). If not found, retry with other plausible 2-letter state codes — a " +
+    "not-found result is free. Verify a hit matches your other evidence (address, officers) " +
+    "before trusting it.",
+  inputSchema: z.object({
+    entity_name: z
+      .string()
+      .min(2)
+      .max(200)
+      .describe("Exact legal/business name to search (e.g. 'Sunshine Marketing LLC')."),
+    state: z
+      .string()
+      .length(2)
+      .describe("Two-letter US state code to search (e.g. 'FL', 'CA', 'DE')."),
+  }),
+  execute: async ({ entity_name, state }): Promise<SosLookupResult> => {
+    const stateCode = state.toUpperCase();
+    const done = log.start("sos_lookup", { entity_name, state: stateCode });
+    const apiKey = process.env.OPEN_SOS_DATA_API_KEY;
+    if (!apiKey) {
+      log.error("sos_lookup misconfigured: OPEN_SOS_DATA_API_KEY is not set");
+      return {
+        found: false,
+        state: stateCode,
+        queriedName: entity_name,
+        error: "OpenSOSData API key is not configured on the server.",
+      };
+    }
+
+    try {
+      const res = await fetch(`${OPEN_SOS_BASE_URL}/v1/lookup`, {
+        method: "POST",
+        headers: {
+          "x-api-key": apiKey,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ entity_name, state: stateCode }),
+        signal: AbortSignal.timeout(SOS_REQUEST_TIMEOUT_MS),
+      });
+
+      // Not found — the state's registry has no match. Not billed.
+      if (res.status === 404) {
+        done({ result: "not_found" });
+        return {
+          found: false,
+          state: stateCode,
+          queriedName: entity_name,
+          message: `No match for "${entity_name}" in ${stateCode}.`,
+        };
+      }
+
+      const json = (await res.json().catch(() => ({}))) as {
+        success?: boolean;
+        async?: boolean;
+        jobId?: string;
+        pollInterval?: number;
+        error?: string;
+      };
+
+      if (!res.ok) {
+        const message =
+          json.error || `Lookup failed (HTTP ${res.status}).`;
+        log.warn("sos_lookup error response", { status: res.status, message });
+        done({ result: "error", status: res.status });
+        return {
+          found: false,
+          state: stateCode,
+          queriedName: entity_name,
+          error: message,
+        };
+      }
+
+      // Async path: poll until the job resolves.
+      if (res.status === 202 || (json.async && json.jobId)) {
+        if (!json.jobId) {
+          done({ result: "error" });
+          return {
+            found: false,
+            state: stateCode,
+            queriedName: entity_name,
+            error: "Lookup was queued but no job id was returned.",
+          };
+        }
+        log.info("sos_lookup queued, polling", { jobId: json.jobId });
+        const polled = await pollSosJob(
+          json.jobId,
+          apiKey,
+          json.pollInterval ?? SOS_POLL_INTERVAL_MS,
+          stateCode,
+        );
+        if (polled.kind === "not_found") {
+          done({ result: "not_found_async" });
+          return {
+            found: false,
+            state: stateCode,
+            queriedName: entity_name,
+            message: `No match for "${entity_name}" in ${stateCode}.`,
+          };
+        }
+        if (polled.kind === "error") {
+          done({ result: "error_async" });
+          return {
+            found: false,
+            state: stateCode,
+            queriedName: entity_name,
+            error: polled.error,
+          };
+        }
+        done({
+          result: "found_async",
+          entity: polled.entity.entityName ?? undefined,
+        });
+        return {
+          found: true,
+          state: stateCode,
+          queriedName: entity_name,
+          entity: polled.entity,
+        };
+      }
+
+      // Synchronous success.
+      const entity = extractEntity(json, stateCode);
+      if (!entity) {
+        done({ result: "empty" });
+        return {
+          found: false,
+          state: stateCode,
+          queriedName: entity_name,
+          message: `No match for "${entity_name}" in ${stateCode}.`,
+        };
+      }
+      done({ result: "found", entity: entity.entityName ?? undefined });
+      return { found: true, state: stateCode, queriedName: entity_name, entity };
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Secretary of State lookup failed.";
+      log.warn("sos_lookup failed", { entity_name, state: stateCode, message });
+      done({ result: "exception" });
+      return {
+        found: false,
+        state: stateCode,
+        queriedName: entity_name,
+        error: message,
+      };
+    }
+  },
+});

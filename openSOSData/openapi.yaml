@@ -1,0 +1,688 @@
+openapi: 3.1.0
+info:
+  title: OpenSOSData API
+  version: 1.2.0
+  description: |
+    Real-time US Secretary of State business entity and UCC filing lookups.
+    Priced at $0.0314 per lookup (Pi). No subscription required.
+    No minimum spend. Public government data should not cost more
+    than a mathematical constant.
+  contact:
+    name: OpenSOSData
+    url: https://opensosdata.com
+servers:
+  - url: https://api.opensosdata.com
+    description: Production
+security:
+  - ApiKeyAuth: []
+paths:
+  /v1/lookup:
+    post:
+      summary: Look up a business entity or UCC filing by name and state
+      operationId: lookupEntity
+      x-payment-info:
+        amount: "0.0314"
+        currency: "usd"
+        description: "Business entity or UCC filing lookup"
+        methods:
+          - type: "tempo"
+            intent: "charge"
+      security:
+        - ApiKeyAuth: []
+        - {}
+      parameters:
+        - name: fresh
+          in: query
+          required: false
+          schema:
+            type: boolean
+          description: Legacy parameter — all lookups now return fresh data by default.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LookupRequest'
+            examples:
+              business_entity:
+                summary: Business entity search
+                value:
+                  entity_name: Apple Inc
+                  state: DE
+              ucc:
+                summary: UCC filing search
+                value:
+                  entity_name: Subway
+                  state: FL
+                  searchType: ucc
+      responses:
+        '200':
+          description: Entity or UCC filing found
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/LookupSuccess'
+                  - $ref: '#/components/schemas/UCCLookupSuccess'
+        '202':
+          description: Lookup queued for async processing (slow states)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AsyncJobCreated'
+        '404':
+          description: Entity not found (not billed)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LookupError'
+        '401':
+          description: Missing or invalid API key
+        '400':
+          description: Invalid request body
+        '402':
+          description: |
+            Payment required. The WWW-Authenticate header contains an MPP
+            challenge. Present valid payment credentials to access this
+            endpoint without an API key.
+          headers:
+            WWW-Authenticate:
+              schema:
+                type: string
+              description: MPP payment challenge
+          content:
+            application/problem+json:
+              schema:
+                type: object
+                properties:
+                  type: { type: string, example: "https://paymentauth.org/problems/payment-required" }
+                  title: { type: string, example: "Payment Required" }
+                  status: { type: integer, example: 402 }
+                  detail: { type: string }
+                  challengeId: { type: string }
+  /v1/lookup/status/{jobId}:
+    get:
+      summary: Poll async lookup job status
+      operationId: lookupStatus
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Job ID returned in the 202 response
+      responses:
+        '200':
+          description: Job status (pending, processing, or complete)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobStatus'
+        '404':
+          description: Job not found
+        '500':
+          description: Job failed
+  /v1/account/balance:
+    get:
+      summary: Check account balance and remaining lookups
+      operationId: accountBalance
+      security:
+        - ApiKeyAuth: []
+      responses:
+        '200':
+          description: Account balance details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountBalance'
+        '404':
+          description: User not found
+  /v1/states:
+    get:
+      summary: List all 50 states with their scraper status
+      operationId: listStates
+      security: []
+      responses:
+        '200':
+          description: List of states
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/StateInfo'
+  /v1/health:
+    get:
+      summary: Service health check
+      operationId: health
+      security: []
+      responses:
+        '200':
+          description: Health status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+  /v1/name-availability:
+    post:
+      operationId: checkNameAvailability
+      summary: Check business name availability
+      description: >
+        Check whether a business name is available to register in a given
+        US state or territory. Returns an availability verdict plus a list
+        of up to 10 conflicting entities (sorted active → neutral → inactive).
+        Charges one lookup credit ($0.0314) per search regardless of result.
+        Results are always live — cache is bypassed for name availability.
+      tags: [Search]
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [entity_name, state]
+              properties:
+                entity_name:
+                  type: string
+                  description: Business name to check availability for
+                  example: "Acme Ventures LLC"
+                state:
+                  type: string
+                  description: 2-letter state/territory code (e.g. CA, DE, NY)
+                  example: "DE"
+                  minLength: 2
+                  maxLength: 2
+      responses:
+        '200':
+          description: Name availability result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  available:
+                    type: boolean
+                    description: >
+                      true if no active entities found matching this name.
+                      false if one or more active entities conflict.
+                    example: false
+                  searchedName:
+                    type: string
+                    example: "Acme Ventures LLC"
+                  state:
+                    type: string
+                    example: "DE"
+                  conflictingEntities:
+                    type: array
+                    maxItems: 10
+                    description: >
+                      Up to 10 entities with similar names, sorted by status
+                      (active first). Empty array when available is true.
+                    items:
+                      type: object
+                      properties:
+                        entityName:
+                          type: string
+                        entityId:
+                          type: string
+                        status:
+                          type: string
+                        statusClass:
+                          type: string
+                          enum: [active, inactive, neutral]
+                        sosUrl:
+                          type: string
+                        entityPageUrl:
+                          type: string
+                  variationNote:
+                    type: string
+                    nullable: true
+                    description: >
+                      Present when searched name has a suffix (LLC/INC) and
+                      a different suffix variant exists as an active entity.
+                  warning:
+                    type: string
+                    nullable: true
+                    description: >
+                      Present when a suspended or revoked entity previously
+                      used this name.
+                  statusNote:
+                    type: string
+                    nullable: true
+                    description: >
+                      Present for states where the SOS portal does not provide
+                      entity status data (e.g. NJ, DE).
+                  cost:
+                    type: number
+                    example: 0.0314
+                  data_source:
+                    type: string
+                    enum: [live, cache]
+                  walletBalance:
+                    type: string
+                  lookupsRemaining:
+                    type: integer
+              example:
+                success: true
+                available: false
+                searchedName: "Acme Ventures LLC"
+                state: "DE"
+                conflictingEntities:
+                  - entityName: "ACME VENTURES LLC"
+                    entityId: "7654321"
+                    status: "Active"
+                    statusClass: "active"
+                    sosUrl: "https://icis.corp.delaware.gov/..."
+                    entityPageUrl: "/entity/delaware/acme-ventures-llc-de-765/"
+                cost: 0.0314
+                data_source: "live"
+                walletBalance: "28.45"
+                lookupsRemaining: 906
+        '400':
+          description: Invalid request or unsupported state
+        '402':
+          description: Insufficient balance
+        '503':
+          description: State portal temporarily unavailable
+  /v1/bulk-lookup:
+    post:
+      summary: Submit a bulk entity lookup job
+      operationId: bulkLookup
+      description: >
+        Submit up to 1,000 entity lookups in a single request. Results are
+        delivered via polling, webhook callback, or email. Each entity in the
+        batch is billed at the standard lookup rate.
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: #/components/schemas/BulkLookupRequest
+      responses:
+        202:
+          description: Bulk job queued
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/BulkJobCreated
+        400:
+          description: Invalid request (empty entities array, exceeds 1000 limit)
+        401:
+          description: Missing or invalid API key
+  /v1/bulk-lookup/{jobId}:
+    get:
+      summary: Poll bulk lookup job status and results
+      operationId: bulkLookupStatus
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Job ID returned in the 202 response
+      responses:
+        200:
+          description: Job status and results (when complete)
+          content:
+            application/json:
+              schema:
+                $ref: #/components/schemas/BulkJobStatus
+        404:
+          description: Job not found
+  /user/billing/settings:
+    patch:
+      summary: Update cached data freshness settings
+      operationId: updateBillingSettings
+      description: >
+        Configure cached data preferences for your account. Requires a
+        Cached Data subscription.
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                maxCacheAgeMonths:
+                  type: integer
+                  minimum: 1
+                  maximum: 24
+                  nullable: true
+                  description: Cached data older than this many months triggers a live scrape
+                cacheFirstDefault:
+                  type: boolean
+                  description: When true, source defaults to cache for all lookups
+      responses:
+        200:
+          description: Settings updated
+        401:
+          description: Missing or invalid API key
+        403:
+          description: No cached data subscription
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: x-api-key
+  schemas:
+    LookupRequest:
+      type: object
+      required: [entity_name, state]
+      properties:
+        entity_name:
+          type: string
+          minLength: 2
+          maxLength: 200
+          description: Business name or debtor name to search
+        state:
+          type: string
+          minLength: 2
+          maxLength: 2
+          description: Two-letter US state code
+        searchType:
+          type: string
+          enum: [business_entity, ucc]
+          default: business_entity
+          description: Type of search to perform
+        searchBy:
+          type: string
+          enum: [debtor, secured_party]
+          description: "Set to secured_party to search by secured party name instead of debtor. Supported states: AL, CA, CO, CT, FL, ID, KY, MA, MT, NC, OH, RI, WV"
+        dateAfter:
+          type: string
+          format: date
+          description: "Filter to filings filed after this date (YYYY-MM-DD). Supported states: CO, CA, ID, MT"
+        dateBefore:
+          type: string
+          format: date
+          description: "Filter to filings filed before this date (YYYY-MM-DD). Supported states: CO, CA, ID, MT"
+        source:
+          type: string
+          enum: [auto, cache, live]
+          default: auto
+          description: >
+            Data source preference. "auto" uses account settings,
+            "cache" forces cached data (requires Cached Data subscription),
+            "live" forces a live scrape from the state portal.
+    EntityData:
+      type: object
+      properties:
+        entityName: { type: string }
+        entityType: { type: string }
+        entityId: { type: string }
+        status: { type: string }
+        formationDate: { type: string }
+        registeredAgentName: { type: string }
+        registeredAgentAddress: { type: string }
+        registeredAgentCity: { type: string }
+        registeredAgentState: { type: string }
+        registeredAgentZip: { type: string }
+        principalAddress: { type: string }
+        principalCity: { type: string }
+        principalState: { type: string }
+        principalZip: { type: string }
+        officers:
+          type: array
+          items:
+            type: object
+            properties:
+              name: { type: string }
+              title: { type: string }
+              address: { type: string, nullable: true, description: Officer address if available }
+        sosUrl: { type: string }
+        scrapedAt: { type: string, format: date-time }
+
+        # --- Filing & Annual Reports ---
+        filingHistory:
+          type: array
+          nullable: true
+          description: "Recent filing history (last 12 months or most recent 10). Availability varies by state."
+          items:
+            type: object
+            properties:
+              event: { type: string, description: "Filing type (e.g. Annual Report, Amendment)" }
+              dateFiled: { type: string, description: "Date the filing was submitted" }
+              effectiveDate: { type: string, nullable: true }
+              documentUrl: { type: string, nullable: true, description: "Direct URL to filing document" }
+              documentNumber: { type: string, nullable: true }
+              controlId: { type: string, nullable: true }
+              trackingNumber: { type: string, nullable: true }
+        annualReports:
+          type: array
+          nullable: true
+          description: "Annual report filings with dates and document links. Availability varies by state."
+          items:
+            type: object
+            properties:
+              year: { type: string }
+              dateFiled: { type: string }
+              documentUrl: { type: string, nullable: true }
+        annualReportDueDate: { type: string, nullable: true, description: "Next annual report due date" }
+        lastAnnualReport: { type: string, nullable: true, description: "Date of last annual report filed" }
+
+        # --- Mailing Address ---
+        mailingAddress: { type: string, nullable: true }
+        mailingCity: { type: string, nullable: true }
+        mailingState: { type: string, nullable: true }
+        mailingZip: { type: string, nullable: true }
+
+        # --- Additional Agent Info ---
+        registeredAgentMailingAddress: { type: string, nullable: true }
+
+        # --- Extended Entity Details ---
+        entityTypeDescription: { type: string, nullable: true, description: "Full entity type description" }
+        stateEntityId: { type: string, nullable: true, description: "State-specific entity identifier" }
+        feiEinNumber: { type: string, nullable: true, description: "Federal EIN" }
+        effectiveDate: { type: string, nullable: true }
+        dissolutionDate: { type: string, nullable: true }
+        inactiveDate: { type: string, nullable: true }
+        revivalDate: { type: string, nullable: true }
+        oldEntityId: { type: string, nullable: true, description: "Previous entity ID if renumbered" }
+
+        # --- Status & Standing ---
+        statusReason: { type: string, nullable: true, description: "Reason for current status" }
+        subStatus: { type: string, nullable: true }
+        standing: { type: string, nullable: true }
+        arStanding: { type: string, nullable: true, description: "Annual report standing" }
+        raStanding: { type: string, nullable: true, description: "Registered agent standing" }
+        otherStanding: { type: string, nullable: true }
+        revenueStanding: { type: string, nullable: true }
+        statementStatus: { type: string, nullable: true }
+        nextStatementDueDate: { type: string, nullable: true }
+
+        # --- Events ---
+        lastEvent: { type: string, nullable: true }
+        eventDateFiled: { type: string, nullable: true }
+        eventEffectiveDate: { type: string, nullable: true }
+
+        # --- Additional Business Info ---
+        profitOrNonProfit: { type: string, nullable: true }
+        industry: { type: string, nullable: true }
+        naicsCode: { type: string, nullable: true, description: "NAICS industry code" }
+        naicsDescription: { type: string, nullable: true, description: "NAICS industry description" }
+        jurisdiction: { type: string, nullable: true, description: "State or country of formation" }
+        authorizedShares: { type: string, nullable: true }
+        foreignLegalName: { type: string, nullable: true }
+        fictitiousName: { type: string, nullable: true }
+        numberOfEmployees: { type: string, nullable: true }
+        primaryCounty: { type: string, nullable: true }
+        county: { type: string, nullable: true }
+        sectionOfLaw: { type: string, nullable: true }
+        durationDate: { type: string, nullable: true, description: "Duration or dissolution date" }
+        serviceOfProcessName: { type: string, nullable: true }
+        serviceOfProcessAddress: { type: string, nullable: true }
+        fiscalMonthDay: { type: string, nullable: true }
+        periodicReportMonth: { type: string, nullable: true }
+
+        # --- Screenshots ---
+        screenshots: { type: object, nullable: true, description: "Source verification screenshots from state portal" }
+    LookupSuccess:
+      type: object
+      properties:
+        success: { type: boolean, example: true }
+        data: { $ref: '#/components/schemas/EntityData' }
+        cost: { type: number, example: 0.0314 }
+        state_scraper_version: { type: string, example: '3.0' }
+        scraper_built_at: { type: string, format: date-time }
+        source:
+          type: string
+          enum: [cache, live]
+          description: Whether the result was served from cache or a live scrape
+        stale:
+          type: boolean
+          description: True if cached data exceeds the freshness threshold
+        cached:
+          type: boolean
+          description: True when the result was served from the cache
+        dataAsOf:
+          type: string
+          format: date-time
+          description: When the cached data was last scraped
+        overage:
+          type: boolean
+          description: True if this lookup exceeded the monthly cached quota
+    UCCFiling:
+      type: object
+      properties:
+        fileNumber: { type: string }
+        fileDate: { type: string }
+        debtorName: { type: string }
+        securedParty: { type: string }
+        collateral: { type: string }
+        status: { type: string }
+        lapseDate: { type: string }
+    UCCLookupSuccess:
+      type: object
+      properties:
+        success: { type: boolean, example: true }
+        data:
+          type: object
+          properties:
+            filings:
+              type: array
+              items:
+                $ref: '#/components/schemas/UCCFiling'
+            totalResults: { type: integer }
+        cost: { type: number, example: 0.0314 }
+    AsyncJobCreated:
+      type: object
+      properties:
+        success: { type: boolean, example: true }
+        async: { type: boolean, example: true }
+        jobId: { type: string }
+        message: { type: string }
+        pollInterval: { type: integer, example: 3000, description: Recommended poll interval in milliseconds }
+        estimatedSeconds: { type: integer, example: 60 }
+    JobStatus:
+      type: object
+      properties:
+        success: { type: boolean }
+        status: { type: string, enum: [pending, processing, complete, failed] }
+        message: { type: string }
+        result:
+          description: Present when status is complete — same shape as a 200 lookup response
+          $ref: '#/components/schemas/LookupSuccess'
+        pollInterval: { type: integer, example: 3000 }
+        cost: { type: number, example: 0.0314 }
+        error: { type: string, description: Present when status is failed }
+    AccountBalance:
+      type: object
+      properties:
+        success: { type: boolean, example: true }
+        type: { type: string, enum: [user, internal] }
+        balanceStored: { type: integer, description: Balance in stored units }
+        balanceDisplay: { type: string, example: '.14' }
+        lookupsRemaining: { type: integer }
+        pricePerLookup: { type: number, example: 0.0314 }
+        topUpUrl: { type: string }
+    LookupError:
+      type: object
+      properties:
+        success: { type: boolean, example: false }
+        error: { type: string, example: Entity not found }
+        cost: { type: number, example: 0, description: No charge on failed lookups }
+    StateInfo:
+      type: object
+      properties:
+        state: { type: string }
+        status: { type: string, enum: [active, degraded, inactive] }
+        version: { type: string }
+        lastTestedAt: { type: string, format: date-time, nullable: true }
+        available: { type: boolean }
+        uccAvailable: { type: boolean }
+    Health:
+      type: object
+      properties:
+        status: { type: string, enum: [healthy, degraded] }
+        checks:
+          type: object
+          properties:
+            redis: { type: string }
+            postgres: { type: string }
+            degraded_scrapers: { type: integer }
+            lookups_today: { type: integer }
+            cache_hit_rate_pct: { type: number }
+        timestamp: { type: string, format: date-time }
+
+    BulkLookupRequest:
+      type: object
+      required: [entities]
+      properties:
+        entities:
+          type: array
+          minItems: 1
+          maxItems: 1000
+          items:
+            type: object
+            required: [entity_name, state]
+            properties:
+              entity_name: { type: string, minLength: 2, maxLength: 200 }
+              state: { type: string, minLength: 2, maxLength: 2 }
+        source:
+          type: string
+          enum: [auto, cache, live]
+          default: auto
+          description: Data source preference applied to all entities in the batch
+        webhook_url:
+          type: string
+          format: uri
+          description: URL to POST results when the job completes
+        email_results:
+          type: boolean
+          default: false
+          description: Email results CSV to your account email
+    BulkJobCreated:
+      type: object
+      properties:
+        job_id: { type: string, example: bulk_abc123 }
+        status: { type: string, example: queued }
+        total: { type: integer, description: Number of entities in the batch }
+        poll_url: { type: string, example: /v1/bulk-lookup/bulk_abc123 }
+    BulkJobStatus:
+      type: object
+      properties:
+        job_id: { type: string }
+        status: { type: string, enum: [queued, processing, complete, failed] }
+        total: { type: integer }
+        completed: { type: integer }
+        failed: { type: integer }
+        results:
+          type: array
+          description: Present when status is complete
+          items:
+            $ref: #/components/schemas/LookupSuccess
