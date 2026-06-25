@@ -68,18 +68,34 @@ type SosEntity = {
   [key: string]: unknown;
 };
 
+type RegisteredAgent = {
+  name: string | null;
+  address: string | null;
+  state: string | null;
+};
+
+// Outcome of the mandatory Florida cross-lookup for a company. See the route.
+type FlCheckStatus = "found" | "not_found" | "error" | "not_applicable";
+
 type DefendantCandidate = {
   company_name: string;
+  legal_name: string | null;
   website: string | null;
   goods_services: string | null;
   state_of_incorporation: string | null;
+  hq_mailing_address: string | null;
+  registered_agent: RegisteredAgent | null;
   employees_estimate: string | null;
   revenue_estimate: string | null;
   solvability_tier: "risk" | "good" | "whale" | "unknown";
   confidence: number;
   sources: string[];
   notes: string | null;
-  sos?: SosEntity | null;
+  // Every official record matched to this company: the home/domestic
+  // registration plus any Florida foreign registration found by the cross-lookup.
+  sos_records?: SosEntity[];
+  // Outcome of the Florida cross-lookup, so the UI can show FL was checked.
+  fl_check?: FlCheckStatus;
 };
 
 type DefendantReport = {
@@ -1007,7 +1023,7 @@ function DefendantDropdown({ cases }: { cases: Case[] }) {
                         <div className="flex flex-col">
                           <span className="flex items-center gap-2 text-sm font-medium text-zinc-900 dark:text-zinc-100">
                             {entry.candidate.company_name}
-                            {entry.candidate.sos && (
+                            {(entry.candidate.sos_records?.length ?? 0) > 0 && (
                               <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200">
                                 SOS verified
                               </span>
@@ -1040,6 +1056,7 @@ function DefendantDropdown({ cases }: { cases: Case[] }) {
                     <SosRecordPanel
                       key={`${entity.entityId ?? entity.entityName ?? "rec"}-${i}`}
                       sos={entity}
+                      label={recordLabel(entity)}
                     />
                   ))}
                 </div>
@@ -1054,10 +1071,23 @@ function DefendantDropdown({ cases }: { cases: Case[] }) {
 
 function CandidateDetail({ entry }: { entry: AggregatedCandidate }) {
   const c = entry.candidate;
+  const records = c.sos_records ?? [];
+  // The record whose registered agent the firm should serve: prefer the Florida
+  // agent, otherwise fall back to the (home) state-of-formation record.
+  const serviceRecord =
+    records.find((rec) => isFloridaRecord(rec)) ?? records[0] ?? null;
+  const agent = c.registered_agent;
+  const agentDisplay =
+    agent && (agent.name || agent.address || agent.state)
+      ? [agent.name, agent.address, agent.state].filter(Boolean).join(" · ")
+      : null;
   const rows: [string, string | null][] = [
+    ["Legal name", c.legal_name],
     ["Website", c.website],
     ["Goods / services", c.goods_services],
     ["State of incorporation", c.state_of_incorporation],
+    ["HQ mailing address", c.hq_mailing_address],
+    ["Registered agent", agentDisplay],
     ["Employees", c.employees_estimate],
     ["Revenue", c.revenue_estimate],
     ["Solvability", SOLVABILITY_LABELS[c.solvability_tier]],
@@ -1090,13 +1120,36 @@ function CandidateDetail({ entry }: { entry: AggregatedCandidate }) {
 
       <div className="mt-4 border-t border-zinc-200 pt-4 dark:border-zinc-800">
         <p className="mb-2 text-[10px] uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-          Official record (Secretary of State)
+          Official records (Secretary of State)
         </p>
-        {c.sos ? (
-          <SosRecordPanel sos={c.sos} />
+        {records.length > 0 ? (
+          <div className="flex flex-col gap-3">
+            {records.map((rec, i) => (
+              <SosRecordPanel
+                key={`${rec.entityId ?? rec.entityName ?? "rec"}-${rec.searchState ?? ""}-${i}`}
+                sos={rec}
+                label={recordLabel(rec)}
+                // Flag the agent to serve only when there's an actual choice
+                // (home vs. Florida) — the firm prefers the Florida agent.
+                preferredAgent={records.length > 1 && rec === serviceRecord}
+              />
+            ))}
+          </div>
         ) : (
           <p className="text-sm text-zinc-500 dark:text-zinc-400">
             No matching Secretary of State record was found for this entity.
+          </p>
+        )}
+        {c.fl_check === "not_found" && (
+          <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
+            No Florida registration on file — Sunbiz was checked for a Florida
+            foreign registration and none was found.
+          </p>
+        )}
+        {c.fl_check === "error" && (
+          <p className="mt-2 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-950 dark:text-amber-200">
+            Florida check didn&apos;t complete — retry to capture any Florida
+            registered agent (preferred for service).
           </p>
         )}
       </div>
@@ -1176,8 +1229,38 @@ function humanizeKey(key: string): string {
     .replace(/^./, (c) => c.toUpperCase());
 }
 
+/** True when this record came from the Florida registry. */
+function isFloridaRecord(sos: SosEntity): boolean {
+  return (sos.searchState ?? "").toUpperCase() === "FL";
+}
+
+/**
+ * A short heading for one official record: the home/domestic registration vs. a
+ * Florida foreign registration (a company incorporated elsewhere but registered
+ * to do business in Florida — the firm's preferred place to serve).
+ */
+function recordLabel(sos: SosEntity): string {
+  const searchState = (sos.searchState ?? "").toUpperCase();
+  if (searchState === "FL") {
+    const home = String(sos.jurisdiction ?? "").toUpperCase();
+    const foreign = home && home !== "FL" && !home.includes("FLORIDA");
+    return foreign ? "Florida registration (foreign)" : "Florida registration";
+  }
+  return searchState
+    ? `Home registration (${searchState})`
+    : "Home registration";
+}
+
 /** Renders an authoritative Secretary of State entity record in full. */
-function SosRecordPanel({ sos }: { sos: SosEntity }) {
+function SosRecordPanel({
+  sos,
+  label,
+  preferredAgent = false,
+}: {
+  sos: SosEntity;
+  label?: string;
+  preferredAgent?: boolean;
+}) {
   const principal = joinAddress([
     sos.principalAddress,
     sos.principalCity,
@@ -1221,6 +1304,20 @@ function SosRecordPanel({ sos }: { sos: SosEntity }) {
 
   return (
     <div className="rounded-lg border border-emerald-200 bg-emerald-50/60 p-4 dark:border-emerald-900/60 dark:bg-emerald-950/30">
+      {(label || preferredAgent) && (
+        <div className="mb-3 flex flex-wrap items-center gap-2 border-b border-emerald-200 pb-2 dark:border-emerald-900/60">
+          {label && (
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-emerald-800 dark:text-emerald-200">
+              {label}
+            </span>
+          )}
+          {preferredAgent && (
+            <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white">
+              ★ Preferred agent to serve
+            </span>
+          )}
+        </div>
+      )}
       <dl className="grid grid-cols-[10rem_1fr] gap-x-4 gap-y-2 text-sm">
         {rows.map(([label, value]) => (
           <Fragment key={label}>

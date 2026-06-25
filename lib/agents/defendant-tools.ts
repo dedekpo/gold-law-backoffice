@@ -266,7 +266,146 @@ async function pollSosJob(
  * Handles the API's async (202 + poll) path transparently, so a single call
  * either returns the entity, a not-found, or an error string. Failures are
  * returned (not thrown) so a bad state guess doesn't abort the whole agent run.
+ *
+ * Exported as a plain function so callers other than the agent (e.g. the route's
+ * deterministic Florida cross-lookup) can run a lookup without going through the
+ * tool wrapper.
  */
+export async function lookupSosEntity(
+  entity_name: string,
+  state: string,
+): Promise<SosLookupResult> {
+  const stateCode = state.toUpperCase();
+  const done = log.start("sos_lookup", { entity_name, state: stateCode });
+  const apiKey = process.env.OPEN_SOS_DATA_API_KEY;
+  if (!apiKey) {
+    log.error("sos_lookup misconfigured: OPEN_SOS_DATA_API_KEY is not set");
+    return {
+      found: false,
+      state: stateCode,
+      queriedName: entity_name,
+      error: "OpenSOSData API key is not configured on the server.",
+    };
+  }
+
+  try {
+    const res = await fetch(`${OPEN_SOS_BASE_URL}/v1/lookup`, {
+      method: "POST",
+      headers: {
+        "x-api-key": apiKey,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ entity_name, state: stateCode }),
+      signal: AbortSignal.timeout(SOS_REQUEST_TIMEOUT_MS),
+    });
+
+    // Not found — the state's registry has no match. Not billed.
+    if (res.status === 404) {
+      done({ result: "not_found" });
+      return {
+        found: false,
+        state: stateCode,
+        queriedName: entity_name,
+        message: `No match for "${entity_name}" in ${stateCode}.`,
+      };
+    }
+
+    const json = (await res.json().catch(() => ({}))) as {
+      success?: boolean;
+      async?: boolean;
+      jobId?: string;
+      pollInterval?: number;
+      error?: string;
+    };
+
+    if (!res.ok) {
+      const message =
+        json.error || `Lookup failed (HTTP ${res.status}).`;
+      log.warn("sos_lookup error response", { status: res.status, message });
+      done({ result: "error", status: res.status });
+      return {
+        found: false,
+        state: stateCode,
+        queriedName: entity_name,
+        error: message,
+      };
+    }
+
+    // Async path: poll until the job resolves.
+    if (res.status === 202 || (json.async && json.jobId)) {
+      if (!json.jobId) {
+        done({ result: "error" });
+        return {
+          found: false,
+          state: stateCode,
+          queriedName: entity_name,
+          error: "Lookup was queued but no job id was returned.",
+        };
+      }
+      log.info("sos_lookup queued, polling", { jobId: json.jobId });
+      const polled = await pollSosJob(
+        json.jobId,
+        apiKey,
+        json.pollInterval ?? SOS_POLL_INTERVAL_MS,
+        stateCode,
+      );
+      if (polled.kind === "not_found") {
+        done({ result: "not_found_async" });
+        return {
+          found: false,
+          state: stateCode,
+          queriedName: entity_name,
+          message: `No match for "${entity_name}" in ${stateCode}.`,
+        };
+      }
+      if (polled.kind === "error") {
+        done({ result: "error_async" });
+        return {
+          found: false,
+          state: stateCode,
+          queriedName: entity_name,
+          error: polled.error,
+        };
+      }
+      done({
+        result: "found_async",
+        entity: polled.entity.entityName ?? undefined,
+      });
+      return {
+        found: true,
+        state: stateCode,
+        queriedName: entity_name,
+        entity: polled.entity,
+      };
+    }
+
+    // Synchronous success.
+    const entity = extractEntity(json, stateCode);
+    if (!entity) {
+      done({ result: "empty" });
+      return {
+        found: false,
+        state: stateCode,
+        queriedName: entity_name,
+        message: `No match for "${entity_name}" in ${stateCode}.`,
+      };
+    }
+    done({ result: "found", entity: entity.entityName ?? undefined });
+    return { found: true, state: stateCode, queriedName: entity_name, entity };
+  } catch (err) {
+    const message =
+      err instanceof Error ? err.message : "Secretary of State lookup failed.";
+    log.warn("sos_lookup failed", { entity_name, state: stateCode, message });
+    done({ result: "exception" });
+    return {
+      found: false,
+      state: stateCode,
+      queriedName: entity_name,
+      error: message,
+    };
+  }
+}
+
 export const sosLookupTool = tool({
   description:
     "Look up a business in a US state's official Secretary of State registry. This is " +
@@ -288,135 +427,5 @@ export const sosLookupTool = tool({
       .length(2)
       .describe("Two-letter US state code to search (e.g. 'FL', 'CA', 'DE')."),
   }),
-  execute: async ({ entity_name, state }): Promise<SosLookupResult> => {
-    const stateCode = state.toUpperCase();
-    const done = log.start("sos_lookup", { entity_name, state: stateCode });
-    const apiKey = process.env.OPEN_SOS_DATA_API_KEY;
-    if (!apiKey) {
-      log.error("sos_lookup misconfigured: OPEN_SOS_DATA_API_KEY is not set");
-      return {
-        found: false,
-        state: stateCode,
-        queriedName: entity_name,
-        error: "OpenSOSData API key is not configured on the server.",
-      };
-    }
-
-    try {
-      const res = await fetch(`${OPEN_SOS_BASE_URL}/v1/lookup`, {
-        method: "POST",
-        headers: {
-          "x-api-key": apiKey,
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({ entity_name, state: stateCode }),
-        signal: AbortSignal.timeout(SOS_REQUEST_TIMEOUT_MS),
-      });
-
-      // Not found — the state's registry has no match. Not billed.
-      if (res.status === 404) {
-        done({ result: "not_found" });
-        return {
-          found: false,
-          state: stateCode,
-          queriedName: entity_name,
-          message: `No match for "${entity_name}" in ${stateCode}.`,
-        };
-      }
-
-      const json = (await res.json().catch(() => ({}))) as {
-        success?: boolean;
-        async?: boolean;
-        jobId?: string;
-        pollInterval?: number;
-        error?: string;
-      };
-
-      if (!res.ok) {
-        const message =
-          json.error || `Lookup failed (HTTP ${res.status}).`;
-        log.warn("sos_lookup error response", { status: res.status, message });
-        done({ result: "error", status: res.status });
-        return {
-          found: false,
-          state: stateCode,
-          queriedName: entity_name,
-          error: message,
-        };
-      }
-
-      // Async path: poll until the job resolves.
-      if (res.status === 202 || (json.async && json.jobId)) {
-        if (!json.jobId) {
-          done({ result: "error" });
-          return {
-            found: false,
-            state: stateCode,
-            queriedName: entity_name,
-            error: "Lookup was queued but no job id was returned.",
-          };
-        }
-        log.info("sos_lookup queued, polling", { jobId: json.jobId });
-        const polled = await pollSosJob(
-          json.jobId,
-          apiKey,
-          json.pollInterval ?? SOS_POLL_INTERVAL_MS,
-          stateCode,
-        );
-        if (polled.kind === "not_found") {
-          done({ result: "not_found_async" });
-          return {
-            found: false,
-            state: stateCode,
-            queriedName: entity_name,
-            message: `No match for "${entity_name}" in ${stateCode}.`,
-          };
-        }
-        if (polled.kind === "error") {
-          done({ result: "error_async" });
-          return {
-            found: false,
-            state: stateCode,
-            queriedName: entity_name,
-            error: polled.error,
-          };
-        }
-        done({
-          result: "found_async",
-          entity: polled.entity.entityName ?? undefined,
-        });
-        return {
-          found: true,
-          state: stateCode,
-          queriedName: entity_name,
-          entity: polled.entity,
-        };
-      }
-
-      // Synchronous success.
-      const entity = extractEntity(json, stateCode);
-      if (!entity) {
-        done({ result: "empty" });
-        return {
-          found: false,
-          state: stateCode,
-          queriedName: entity_name,
-          message: `No match for "${entity_name}" in ${stateCode}.`,
-        };
-      }
-      done({ result: "found", entity: entity.entityName ?? undefined });
-      return { found: true, state: stateCode, queriedName: entity_name, entity };
-    } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Secretary of State lookup failed.";
-      log.warn("sos_lookup failed", { entity_name, state: stateCode, message });
-      done({ result: "exception" });
-      return {
-        found: false,
-        state: stateCode,
-        queriedName: entity_name,
-        error: message,
-      };
-    }
-  },
+  execute: ({ entity_name, state }) => lookupSosEntity(entity_name, state),
 });

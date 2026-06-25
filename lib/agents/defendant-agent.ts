@@ -7,7 +7,15 @@ import { fetchPageTool, sosLookupTool, webSearchTool } from "./defendant-tools";
 import { rateLimitedModel } from "./model";
 
 export const candidateSchema = z.object({
-  company_name: z.string().describe("Best-guess legal or brand name of the company."),
+  company_name: z.string().describe("Best-guess brand or trade name of the company."),
+  legal_name: z
+    .string()
+    .nullable()
+    .describe(
+      "Exact registered legal entity name (e.g. 'Sunshine Marketing, LLC'), distinct " +
+        "from the brand company_name. Prefer the name from the Secretary of State record. " +
+        "Null if not found.",
+    ),
   website: z.string().nullable().describe("Primary website URL, or null if unknown."),
   goods_services: z
     .string()
@@ -16,7 +24,33 @@ export const candidateSchema = z.object({
   state_of_incorporation: z
     .string()
     .nullable()
-    .describe("US state of incorporation if found (e.g. 'Florida'), else null."),
+    .describe(
+      "Home state of formation / incorporation if found (e.g. 'Florida'), else null.",
+    ),
+  hq_mailing_address: z
+    .string()
+    .nullable()
+    .describe(
+      "Main office / headquarters mailing address (the principal address from the " +
+        "official record when available). Null if not found.",
+    ),
+  registered_agent: z
+    .object({
+      name: z.string().nullable().describe("Registered agent name, or null."),
+      address: z
+        .string()
+        .nullable()
+        .describe("Registered agent's full address, or null."),
+      state: z
+        .string()
+        .nullable()
+        .describe("Registered agent's state (e.g. 'FL'), or null."),
+    })
+    .nullable()
+    .describe(
+      "The registered agent the firm would serve, from the Secretary of State record. " +
+        "Null if no agent was found.",
+    ),
   employees_estimate: z
     .string()
     .nullable()
@@ -86,13 +120,16 @@ problem in a loop:
      official record is the most valuable output of this investigation.
 
 When you have finished investigating, write a concise FINAL REPORT in plain text. For EACH distinct
-company you can support with evidence, state: the company / legal name (use the exact legal name from
-the Secretary of State record when you found one); website; the goods or services it sells; state of
-incorporation (prefer the official state of formation from \`sos_lookup\`); an employee-count estimate
-and a revenue estimate (if found); your solvability rating (risk / good / whale / unknown); your
-confidence from 0 to 1; the source URLs you relied on; and any notable next steps. Note in the report
-which state's registry confirmed the entity. If you genuinely cannot identify any company, say so
-plainly — do not invent one.
+company you can support with evidence, state: the brand/trade name; the exact registered legal name
+(use the exact legal name from the Secretary of State record when you found one — note when it differs
+from the brand name); website; the goods or services it sells; the home state of incorporation /
+formation (prefer the official state from \`sos_lookup\`); the main office / HQ mailing address (the
+principal address from the official record when available); the registered agent's name, address, and
+state (exactly as they appear in the Secretary of State record); an employee-count estimate and a
+revenue estimate (if found); your solvability rating (risk / good / whale / unknown); your confidence
+from 0 to 1; the source URLs you relied on; and any notable next steps. State any of these you could
+not find as "not found" rather than guessing. Note in the report which state's registry confirmed the
+entity. If you genuinely cannot identify any company, say so plainly — do not invent one.
 
 --- SOP (source of truth) ---
 `;
