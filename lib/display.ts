@@ -126,12 +126,19 @@ export function preferredServiceRecord(records: SosEntity[]): SosEntity | null {
 export function candidateEvidence(
   caseFiles: CaseFile[],
   candidate: DefendantCandidate,
+  options?: { fallback?: boolean },
 ): { files: CaseFile[]; attributed: boolean } {
   const names = new Set(candidate.evidence_files ?? []);
   const matched = names.size
     ? caseFiles.filter((file) => names.has(file.name))
     : [];
   if (matched.length > 0) return { files: matched, attributed: true };
+  // Nothing could be attributed. By default fall back to the whole case so proof
+  // is never hidden (single-company download / the card). Callers that file each
+  // company's evidence separately (the case bundle) pass `fallback: false`, so
+  // unattributed files are routed to their own folder instead of being copied
+  // into every company.
+  if (options?.fallback === false) return { files: [], attributed: false };
   return { files: caseFiles, attributed: false };
 }
 

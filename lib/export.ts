@@ -39,14 +39,32 @@ export type CompanyManifest = {
   evidence: EvidenceEntry[];
 };
 
+/** One company inside the case bundle: its folder, evidence, and research. */
+export type CaseCompanyEntry = {
+  /** Folder within the zip, e.g. "companies/acme-loans-llc". */
+  folder: string;
+  /** False when no file could be attributed (this company has no evidence). */
+  evidenceAttributed: boolean;
+  company: DefendantCandidate;
+  /** This company's evidence, at its path inside the zip. */
+  evidence: EvidenceEntry[];
+};
+
 export type CaseManifest = {
   generatedAt: string;
   case: { id: string; name: string };
   evaluation: Case["evaluation"] | null;
-  companies: DefendantCandidate[];
+  companies: CaseCompanyEntry[];
   unmatchedSosRecords: SosEntity[];
-  evidence: EvidenceEntry[];
+  /** Evidence not attributed to any identified company. */
+  unattributedEvidence: EvidenceEntry[];
 };
+
+/** Folder for evidence the agent couldn't tie to any identified company. */
+const UNATTRIBUTED_DIR = "Unattributed Evidence";
+
+/** Source pairing used while building a zip: a file and its manifest entry. */
+type ResolvedEvidence = { file: CaseFile; entry: EvidenceEntry };
 
 function slugify(value: string): string {
   return (
@@ -75,15 +93,21 @@ function uniqueName(used: Set<string>, name: string): string {
   return candidate;
 }
 
+/** Give every company a unique folder slug within the bundle. */
+function uniqueSlug(used: Set<string>, slug: string): string {
+  let candidate = slug;
+  let i = 2;
+  while (used.has(candidate)) candidate = `${slug}-${i++}`;
+  used.add(candidate);
+  return candidate;
+}
+
 /**
  * Resolve a set of case files to their final zip paths (deduping names), pairing
  * each manifest entry with the source file so the zip writer can fetch its bytes
  * at the exact same path the manifest advertises.
  */
-function resolveEvidence(
-  files: CaseFile[],
-  folder: string,
-): Array<{ file: CaseFile; entry: EvidenceEntry }> {
+function resolveEvidence(files: CaseFile[], folder: string): ResolvedEvidence[] {
   const used = new Set<string>();
   return files.map((file) => {
     const zipName = uniqueName(used, file.name);
@@ -99,14 +123,23 @@ function resolveEvidence(
   });
 }
 
-/** Assemble the complete record for one company within its case. */
+/**
+ * Assemble the complete record for one company within its case. By default
+ * (`fallback` on) the evidence falls back to the whole case when the agent
+ * couldn't attribute any file, so a single-company download is never empty. The
+ * case bundle passes `fallback: false` so unattributed files go to their own
+ * folder instead of being copied into every company.
+ */
 export function buildCompanyManifest(
   caseItem: Case,
   candidate: DefendantCandidate,
+  options?: { fallback?: boolean },
 ): CompanyManifest {
-  // Only the evidence tied to this company (falls back to the whole case when
-  // the agent couldn't attribute), so each company's bundle is self-contained.
-  const { files, attributed } = candidateEvidence(caseItem.files, candidate);
+  const { files, attributed } = candidateEvidence(
+    caseItem.files,
+    candidate,
+    options,
+  );
   return {
     generatedAt: new Date().toISOString(),
     case: { id: caseItem.id, name: caseItem.name },
@@ -117,16 +150,62 @@ export function buildCompanyManifest(
   };
 }
 
+/**
+ * Lay out the whole case for bundling: each company gets its own folder holding
+ * the evidence attributed to it, and any leftover (unattributed) evidence is
+ * routed to a single shared folder. Returns the manifest plus the file→path
+ * pairings the zip writer needs to add the raw bytes.
+ */
+function planCase(caseItem: Case): {
+  manifest: CaseManifest;
+  sources: ResolvedEvidence[];
+} {
+  const usedDirs = new Set<string>();
+  const sources: ResolvedEvidence[] = [];
+  const claimed = new Set<string>(); // file ids claimed by ≥1 company
+
+  const companies: CaseCompanyEntry[] = (caseItem.defendants ?? []).map(
+    (candidate) => {
+      const folder = `companies/${uniqueSlug(
+        usedDirs,
+        slugify(candidate.legal_name || candidate.company_name),
+      )}`;
+      // Strict attribution: only this company's files (no whole-case fallback).
+      const { files, attributed } = candidateEvidence(caseItem.files, candidate, {
+        fallback: false,
+      });
+      files.forEach((f) => claimed.add(f.id));
+      const resolved = resolveEvidence(files, `${folder}/evidence`);
+      sources.push(...resolved);
+      return {
+        folder,
+        evidenceAttributed: attributed,
+        company: candidate,
+        evidence: resolved.map((r) => r.entry),
+      };
+    },
+  );
+
+  const orphans = caseItem.files.filter((f) => !claimed.has(f.id));
+  const orphanResolved = resolveEvidence(orphans, UNATTRIBUTED_DIR);
+  sources.push(...orphanResolved);
+
+  return {
+    manifest: {
+      generatedAt: new Date().toISOString(),
+      case: { id: caseItem.id, name: caseItem.name },
+      evaluation: caseItem.evaluation ?? null,
+      companies,
+      unmatchedSosRecords: caseItem.defendantUnmatchedSos ?? [],
+      unattributedEvidence: orphanResolved.map((r) => r.entry),
+    },
+    sources,
+  };
+}
+
 /** Assemble the case-level record: every company plus all of its evidence. */
 export function buildCaseManifest(caseItem: Case): CaseManifest {
-  return {
-    generatedAt: new Date().toISOString(),
-    case: { id: caseItem.id, name: caseItem.name },
-    evaluation: caseItem.evaluation ?? null,
-    companies: caseItem.defendants ?? [],
-    unmatchedSosRecords: caseItem.defendantUnmatchedSos ?? [],
-    evidence: resolveEvidence(caseItem.files, "evidence").map((r) => r.entry),
-  };
+  return planCase(caseItem).manifest;
 }
 
 // --- Readable summaries -------------------------------------------------------
@@ -270,7 +349,15 @@ export function companySummaryText(manifest: CompanyManifest): string {
 export function caseSummaryText(manifest: CaseManifest): string {
   const companies = manifest.companies.length
     ? manifest.companies
-        .map((c, i) => `COMPANY ${i + 1}\n${companyBlock(c)}`)
+        .map((entry, i) =>
+          [
+            `COMPANY ${i + 1}  (folder: ${entry.folder}/)`,
+            companyBlock(entry.company),
+            "",
+            `  EVIDENCE (${entry.evidence.length})`,
+            evidenceText(entry.evidence),
+          ].join("\n"),
+        )
         .join(`\n\n${"-".repeat(60)}\n\n`)
     : "(no companies identified)";
   const unmatched = manifest.unmatchedSosRecords.length
@@ -294,8 +381,8 @@ export function caseSummaryText(manifest: CaseManifest): string {
     companies,
     unmatched,
     "",
-    `EVIDENCE (${manifest.evidence.length})`,
-    evidenceText(manifest.evidence),
+    `UNATTRIBUTED EVIDENCE (${manifest.unattributedEvidence.length}) — folder: ${UNATTRIBUTED_DIR}/`,
+    evidenceText(manifest.unattributedEvidence),
     "",
   ].join("\n");
 }
@@ -334,21 +421,28 @@ export async function buildCompanyZip(
   return new Blob([zipSync(entries, { level: 0 })], { type: "application/zip" });
 }
 
-/** Build a single zip for an entire case (all companies + all evidence). */
+/**
+ * Build a single zip for an entire case. Each company gets its own folder
+ * containing its manifest, summary, and the evidence attributed to it; evidence
+ * tied to no company lands in the "Unattributed Evidence" folder.
+ */
 export async function buildCaseZip(caseItem: Case): Promise<Blob> {
-  const manifest = buildCaseManifest(caseItem);
+  const { manifest, sources } = planCase(caseItem);
   const entries: Zippable = {
     "manifest.json": strToU8(JSON.stringify(manifest, null, 2)),
     "summary.txt": strToU8(caseSummaryText(manifest)),
   };
-  // Per-company sub-manifests/summaries so each defendant is filed on its own.
-  for (const candidate of manifest.companies) {
-    const sub = buildCompanyManifest(caseItem, candidate);
-    const dir = `companies/${slugify(candidate.legal_name || candidate.company_name)}`;
-    entries[`${dir}/manifest.json`] = strToU8(JSON.stringify(sub, null, 2));
-    entries[`${dir}/summary.txt`] = strToU8(companySummaryText(sub));
+  // Each company folder mirrors a standalone company bundle: its own manifest +
+  // summary alongside its evidence. Strict attribution (no whole-case fallback)
+  // so files map to exactly one company or to the unattributed folder.
+  for (const entry of manifest.companies) {
+    const sub = buildCompanyManifest(caseItem, entry.company, { fallback: false });
+    entries[`${entry.folder}/manifest.json`] = strToU8(
+      JSON.stringify(sub, null, 2),
+    );
+    entries[`${entry.folder}/summary.txt`] = strToU8(companySummaryText(sub));
   }
-  await addEvidence(entries, resolveEvidence(caseItem.files, "evidence"));
+  await addEvidence(entries, sources);
   return new Blob([zipSync(entries, { level: 0 })], { type: "application/zip" });
 }
 

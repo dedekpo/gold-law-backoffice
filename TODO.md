@@ -67,10 +67,12 @@ together to sign off.
 
 **Status:** Implemented (client-side zip via `fflate`). Per-company "Download" on
 each company card produces `<company>.zip`, and a case-level "Download all" in the
-case header produces `<case>.zip` (every company + all evidence + per-company
-subfolders). Each zip carries `manifest.json` (machine-readable, maps onto the
-future DB record) and `summary.txt` (human-readable handoff), plus the raw
-evidence under `evidence/`. Stopgap until the database lands.
+case header produces `<case>.zip`. In the case zip each company gets its own
+`companies/<slug>/` folder holding its manifest, summary, and the evidence
+attributed to it; evidence tied to no company goes in an `Unattributed Evidence/`
+folder. Each zip carries `manifest.json` (machine-readable, maps onto the future
+DB record) and `summary.txt` (human-readable handoff). Stopgap until the database
+lands.
 
 We have no database yet, so found results only live in the browser session. We need
 a way to export everything tied to a company so it can be filed/handed off.
