@@ -135,11 +135,17 @@ export const fetchPageTool = tool({
 // --- OpenSOSData: real-time Secretary of State entity lookups -----------------
 
 const OPEN_SOS_BASE_URL = "https://api.opensosdata.com";
-const SOS_REQUEST_TIMEOUT_MS = 30_000;
+// Live scrapes for slow states (CAPTCHA / multi-step portals like Wyoming) can
+// hold the initial request for minutes before returning data or handing back a
+// 202 job. Give the lookup up to 5 minutes so we stop aborting results the API
+// can actually retrieve. The lightweight status poll keeps a short per-request
+// cap since each check returns immediately.
+const SOS_LOOKUP_TIMEOUT_MS = 300_000;
+const SOS_STATUS_TIMEOUT_MS = 30_000;
 // Slow states return 202 + a jobId; we poll the status endpoint until it
-// resolves. Keep the total well under the route's 300s budget.
+// resolves, for up to the same 5-minute budget.
 const SOS_POLL_INTERVAL_MS = 3_000;
-const SOS_MAX_POLL_MS = 150_000;
+const SOS_MAX_POLL_MS = 300_000;
 
 /**
  * A Secretary of State entity record. Mirrors OpenSOSData's `EntityData` shape;
@@ -236,7 +242,7 @@ async function pollSosJob(
     await sleep(pollInterval);
     const res = await fetch(`${OPEN_SOS_BASE_URL}/v1/lookup/status/${jobId}`, {
       headers: { "x-api-key": apiKey },
-      signal: AbortSignal.timeout(SOS_REQUEST_TIMEOUT_MS),
+      signal: AbortSignal.timeout(SOS_STATUS_TIMEOUT_MS),
     });
     if (res.status === 404) return { kind: "not_found" };
     const json = (await res.json().catch(() => ({}))) as {
@@ -296,7 +302,7 @@ export async function lookupSosEntity(
         "content-type": "application/json",
       },
       body: JSON.stringify({ entity_name, state: stateCode }),
-      signal: AbortSignal.timeout(SOS_REQUEST_TIMEOUT_MS),
+      signal: AbortSignal.timeout(SOS_LOOKUP_TIMEOUT_MS),
     });
 
     // Not found — the state's registry has no match. Not billed.

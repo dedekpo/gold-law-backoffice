@@ -70,6 +70,15 @@ export const candidateSchema = z.object({
     .max(1)
     .describe("How confident you are this is the right entity, 0 to 1."),
   sources: z.array(z.string()).describe("URLs that support this candidate."),
+  evidence_files: z
+    .array(z.string())
+    .describe(
+      "The exact filename(s) of the originating evidence that point to THIS company — copied " +
+        "verbatim from the '### File N — … — <filename>' header of each file the company was " +
+        "identified from (e.g. its phone number, brand, or message names this company). A company " +
+        "may come from several files, and different companies may come from different files. Empty " +
+        "only when no specific file can be tied to this company.",
+    ),
   notes: z
     .string()
     .nullable()
@@ -127,9 +136,12 @@ formation (prefer the official state from \`sos_lookup\`); the main office / HQ 
 principal address from the official record when available); the registered agent's name, address, and
 state (exactly as they appear in the Secretary of State record); an employee-count estimate and a
 revenue estimate (if found); your solvability rating (risk / good / whale / unknown); your confidence
-from 0 to 1; the source URLs you relied on; and any notable next steps. State any of these you could
-not find as "not found" rather than guessing. Note in the report which state's registry confirmed the
-entity. If you genuinely cannot identify any company, say so plainly — do not invent one.
+from 0 to 1; the source URLs you relied on; and any notable next steps. Also state which evidence
+file(s) this company was identified from, citing the EXACT filename shown in that file's
+"### File N — … — <filename>" header (a company may come from more than one file, and different
+companies may come from different files). State any of these you could not find as "not found" rather
+than guessing. Note in the report which state's registry confirmed the entity. If you genuinely cannot
+identify any company, say so plainly — do not invent one.
 
 --- SOP (source of truth) ---
 `;
@@ -138,7 +150,12 @@ const FORMAT_INSTRUCTIONS = `You convert a forensic investigator's written repor
 structure. Extract every company the investigator identified into the schema, using ONLY facts present
 in the report — never invent companies, websites, numbers, or sources. If a field is not stated in the
 report, use null (or an empty array for sources). If the report identifies no company, return an empty
-\`candidates\` array.`;
+\`candidates\` array.
+
+For \`evidence_files\`, list the originating evidence file(s) the report ties to each company. Match
+each one to the EXACT filename from the "Available evidence files" list below — copy the name verbatim
+and never invent a name or include one that is not in that list. If the report does not tie a company
+to any specific file, use an empty array.`;
 
 let cachedAgent: Promise<ToolLoopAgent<never, typeof tools>> | undefined;
 
@@ -188,17 +205,25 @@ export function getDefendantAgent() {
  */
 export async function formatDefendantReport(
   report: string,
+  fileNames: string[] = [],
 ): Promise<DefendantReport> {
   if (!report.trim()) {
     return { candidates: [], search_terms_used: [] };
   }
+  // Give the formatter the canonical filenames so it attributes each company to
+  // exact names from this case rather than a paraphrase it read in the report.
+  const fileList = fileNames.length
+    ? `Available evidence files (use these exact names for evidence_files):\n${fileNames
+        .map((name) => `- ${name}`)
+        .join("\n")}\n\n--- REPORT ---\n`
+    : "";
   const { output } = await generateText({
     model: rateLimitedModel(MODELS.agent),
     maxRetries: 0,
     temperature: 0,
     output: Output.object({ schema: defendantReportSchema }),
     system: FORMAT_INSTRUCTIONS,
-    prompt: report,
+    prompt: `${fileList}${report}`,
   });
   return output;
 }

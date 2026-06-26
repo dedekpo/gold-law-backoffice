@@ -152,8 +152,12 @@ const requestSchema = z.object({
     .optional(),
 });
 
-// The agent loops through several search/fetch round-trips; give it room locally.
-export const maxDuration = 300;
+// The agent loops through several search/fetch round-trips, and a single slow
+// Secretary of State scrape can now hold for up to 5 minutes (see
+// SOS_LOOKUP_TIMEOUT_MS). Give the route generous headroom so a slow lookup
+// isn't killed mid-flight. NOTE: hosted platforms cap function duration by plan
+// (e.g. Vercel) — this value is only honored where the platform allows it.
+export const maxDuration = 800;
 
 export async function POST(request: Request) {
   const log = baseLog.child(nextRequestId());
@@ -202,8 +206,19 @@ export async function POST(request: Request) {
 
     // Phase 2 — structure that report into the schema (tool-free, JSON output).
     const doneFormat = log.start("agent.format");
-    const report = await formatDefendantReport(result.text);
-    const candidates = report.candidates ?? [];
+    const report = await formatDefendantReport(
+      result.text,
+      files.map((f) => f.name),
+    );
+    // Keep only attributions that name a real file in this case, so a stray /
+    // paraphrased filename never points the UI at evidence that isn't there.
+    const knownFileNames = new Set(files.map((f) => f.name));
+    const candidates = (report.candidates ?? []).map((c) => ({
+      ...c,
+      evidence_files: (c.evidence_files ?? []).filter((name) =>
+        knownFileNames.has(name),
+      ),
+    }));
     doneFormat({
       candidates: candidates.length,
       companies: candidates.map((c) => c.company_name).join(" | ") || "(none)",

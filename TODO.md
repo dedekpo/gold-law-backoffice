@@ -39,7 +39,10 @@ should surface it.
 
 ## 2. Attach the originating evidence (audio + images) to the company card
 
-**Status:** Not implemented today.
+**Status:** Implemented. The agent now attributes each company to the exact
+originating file(s) (`evidence_files` on the candidate); the company card and the
+download manifest show only that company's evidence, falling back to all case
+files (with a note) when nothing could be attributed.
 
 When the agent identifies a company, the result is shown in the "Identified
 companies" dropdown with no link back to the evidence it came from. If we find a
@@ -62,7 +65,12 @@ together to sign off.
 
 ## 3. Download everything for a found company as a single bundle (zip)
 
-**Status:** Not implemented today. (Stopgap until we have a database.)
+**Status:** Implemented (client-side zip via `fflate`). Per-company "Download" on
+each company card produces `<company>.zip`, and a case-level "Download all" in the
+case header produces `<case>.zip` (every company + all evidence + per-company
+subfolders). Each zip carries `manifest.json` (machine-readable, maps onto the
+future DB record) and `summary.txt` (human-readable handoff), plus the raw
+evidence under `evidence/`. Stopgap until the database lands.
 
 We have no database yet, so found results only live in the browser session. We need
 a way to export everything tied to a company so it can be filed/handed off.
