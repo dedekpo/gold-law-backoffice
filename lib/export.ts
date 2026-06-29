@@ -14,7 +14,13 @@ import {
   messageTypeLabel,
   recordLabel,
 } from "./display";
-import type { Case, CaseFile, DefendantCandidate, SosEntity } from "./types";
+import type {
+  AudioForensics,
+  Case,
+  CaseFile,
+  DefendantCandidate,
+  SosEntity,
+} from "./types";
 
 /** One evidence file as it appears in a manifest (and at this path in the zip). */
 export type EvidenceEntry = {
@@ -24,12 +30,19 @@ export type EvidenceEntry = {
   text: string | null;
   /** Path the raw file lives at inside the zip (e.g. "evidence/voicemail.mp3"). */
   file: string;
+  /** Audio-only forensic automation analysis, when available. */
+  forensics: AudioForensics | null;
 };
 
 export type CompanyManifest = {
   generatedAt: string;
   case: { id: string; name: string };
-  evaluation: Case["evaluation"] | null;
+  /**
+   * Case-wide TCPA evaluation. Present in a standalone single-company bundle;
+   * omitted in the case bundle's per-company folders, where it lives only in the
+   * root (it is identical across companies).
+   */
+  evaluation?: Case["evaluation"] | null;
   company: DefendantCandidate;
   /**
    * Whether `evidence` is the file(s) attributed to this specific company
@@ -118,6 +131,7 @@ function resolveEvidence(files: CaseFile[], folder: string): ResolvedEvidence[] 
         kind: file.kind,
         text: file.text ?? null,
         file: `${folder}/${zipName}`,
+        forensics: file.forensics ?? null,
       },
     };
   });
@@ -133,21 +147,26 @@ function resolveEvidence(files: CaseFile[], folder: string): ResolvedEvidence[] 
 export function buildCompanyManifest(
   caseItem: Case,
   candidate: DefendantCandidate,
-  options?: { fallback?: boolean },
+  options?: { fallback?: boolean; includeEvaluation?: boolean },
 ): CompanyManifest {
   const { files, attributed } = candidateEvidence(
     caseItem.files,
     candidate,
     options,
   );
-  return {
+  const manifest: CompanyManifest = {
     generatedAt: new Date().toISOString(),
     case: { id: caseItem.id, name: caseItem.name },
-    evaluation: caseItem.evaluation ?? null,
     company: candidate,
     evidenceAttributed: attributed,
     evidence: resolveEvidence(files, "evidence").map((r) => r.entry),
   };
+  // The case-wide evaluation is included for a standalone company bundle, but
+  // omitted in the case bundle's per-company folders (it lives in the root).
+  if (options?.includeEvaluation ?? true) {
+    manifest.evaluation = caseItem.evaluation ?? null;
+  }
+  return manifest;
 }
 
 /**
@@ -278,12 +297,53 @@ function evidenceText(evidence: EvidenceEntry[]): string {
   if (evidence.length === 0) return "  (no evidence files)";
   return evidence
     .map((e) => {
-      const head = `  - ${e.name} [${e.kind}] → ${e.file}`;
-      if (!e.text) return head;
-      const label = e.kind === "audio" ? "Transcription" : "Description";
-      return `${head}\n    ${label}:\n    ${e.text.replace(/\n/g, "\n    ")}`;
+      const parts = [`  - ${e.name} [${e.kind}] → ${e.file}`];
+      if (e.text) {
+        const label = e.kind === "audio" ? "Transcription" : "Description";
+        parts.push(`    ${label}:\n    ${e.text.replace(/\n/g, "\n    ")}`);
+      }
+      if (e.forensics) {
+        const f = e.forensics;
+        const verdict = f.is_likely_prerecorded ? "is" : "is not";
+        parts.push(
+          [
+            `    Audio Forensic Analysis — Automated Likelihood ${f.automated_likelihood}/10 ` +
+              `(${f.is_likely_prerecorded ? "likely" : "not likely"} pre-recorded):`,
+            `    Why it ${verdict} likely pre-recorded:`,
+            ...f.factors.map((x) => `      - ${x.name}: ${x.explanation}`),
+            `    Personalization Analysis:`,
+            `      ${f.personalization_analysis.replace(/\n/g, "\n      ")}`,
+          ].join("\n"),
+        );
+      }
+      return parts.join("\n");
     })
     .join("\n\n");
+}
+
+/** Evidence-ready forensic report for one recording. */
+export function forensicsReportText(
+  fileName: string,
+  f: AudioForensics,
+): string {
+  const verdict = f.is_likely_prerecorded ? "is" : "is not";
+  return [
+    DIV,
+    "AUDIO FORENSIC ANALYSIS",
+    DIV,
+    `File: ${fileName}`,
+    `Generated: ${new Date().toISOString()}`,
+    "",
+    `Automated Likelihood: ${f.automated_likelihood}/10`,
+    `Conclusion: this recording ${verdict} likely pre-recorded / automated.`,
+    "",
+    `Why it ${verdict} likely pre-recorded:`,
+    ...f.factors.map((x) => `  - ${x.name}: ${x.explanation}`),
+    "",
+    "Personalization Analysis:",
+    `  ${f.personalization_analysis.replace(/\n/g, "\n  ")}`,
+    "",
+  ].join("\n");
 }
 
 function companyBlock(candidate: DefendantCandidate): string {
@@ -322,7 +382,7 @@ function companyBlock(candidate: DefendantCandidate): string {
 
 /** Human-readable handoff for a single company. */
 export function companySummaryText(manifest: CompanyManifest): string {
-  return [
+  const lines = [
     DIV,
     "GOLD LAW — COMPANY HANDOFF",
     DIV,
@@ -332,9 +392,13 @@ export function companySummaryText(manifest: CompanyManifest): string {
     "COMPANY",
     companyBlock(manifest.company),
     "",
-    "TCPA EVALUATION",
-    evaluationText(manifest.evaluation),
-    "",
+  ];
+  // Only present in a standalone company bundle; in the case bundle the
+  // evaluation lives in the root summary.
+  if (manifest.evaluation !== undefined) {
+    lines.push("TCPA EVALUATION", evaluationText(manifest.evaluation), "");
+  }
+  lines.push(
     `EVIDENCE (${manifest.evidence.length})${
       manifest.evidenceAttributed
         ? ""
@@ -342,7 +406,8 @@ export function companySummaryText(manifest: CompanyManifest): string {
     }`,
     evidenceText(manifest.evidence),
     "",
-  ].join("\n");
+  );
+  return lines.join("\n");
 }
 
 /** Human-readable handoff for an entire case. */
@@ -403,6 +468,12 @@ async function addEvidence(
   const bytes = await Promise.all(resolved.map((r) => fileBytes(r.file)));
   resolved.forEach((r, i) => {
     entries[r.entry.file] = bytes[i];
+    // Drop the evidence-ready forensic report next to the recording it analyzes.
+    if (r.file.forensics) {
+      entries[`${r.entry.file} — Forensic Analysis.txt`] = strToU8(
+        forensicsReportText(r.file.name, r.file.forensics),
+      );
+    }
   });
 }
 
@@ -436,7 +507,10 @@ export async function buildCaseZip(caseItem: Case): Promise<Blob> {
   // summary alongside its evidence. Strict attribution (no whole-case fallback)
   // so files map to exactly one company or to the unattributed folder.
   for (const entry of manifest.companies) {
-    const sub = buildCompanyManifest(caseItem, entry.company, { fallback: false });
+    const sub = buildCompanyManifest(caseItem, entry.company, {
+      fallback: false,
+      includeEvaluation: false, // case-wide evaluation lives in the root only
+    });
     entries[`${entry.folder}/manifest.json`] = strToU8(
       JSON.stringify(sub, null, 2),
     );

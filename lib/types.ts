@@ -8,6 +8,29 @@ export type FileStatus = "processing" | "done" | "error";
 export type EvaluationStatus = "idle" | "evaluating" | "done" | "error";
 export type DefendantStatus = "idle" | "identifying" | "done" | "error";
 
+/** One factor supporting the forensic automation assessment. */
+export type ForensicFactor = {
+  /** Short technical label, e.g. "Uniform cadence" or "Ambient silence". */
+  name: string;
+  /** Why this audio cue suggests automation or human origin. */
+  explanation: string;
+};
+
+/**
+ * Audio forensic analysis of a recorded voicemail — whether it is an automated /
+ * pre-recorded drop vs. a live human recording. Written to be filed as evidence.
+ */
+export type AudioForensics = {
+  /** 0 (clearly human) to 10 (clearly automated/pre-recorded). */
+  automated_likelihood: number;
+  /** Headline conclusion: is this likely a pre-recorded/automated message. */
+  is_likely_prerecorded: boolean;
+  /** The acoustic/technical cues behind the assessment. */
+  factors: ForensicFactor[];
+  /** Dynamic insertion ("Hi Courtney") vs. AI voice cloning vs. none. */
+  personalization_analysis: string;
+};
+
 /** One piece of originating evidence in a case (a voicemail or a screenshot). */
 export type CaseFile = {
   id: string;
@@ -19,6 +42,10 @@ export type CaseFile = {
   /** Transcription (audio) or description (image), once processed. */
   text?: string;
   error?: string;
+  /** Audio-only: forensic automation analysis, run after transcription. */
+  forensicsStatus?: FileStatus;
+  forensics?: AudioForensics;
+  forensicsError?: string;
 };
 
 /** The TCPA rubric evaluation for a case. */

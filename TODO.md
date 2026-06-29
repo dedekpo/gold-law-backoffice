@@ -96,3 +96,19 @@ exists — one self-contained package per company with proof + all research.
   files so the bundle is self-describing.
 - Design the export shape so it maps cleanly onto the future database record (so the
   eventual DB migration is straightforward).
+
+---
+
+## 4. Audio forensic analysis (automated / pre-recorded voicemail detection)
+
+**Status:** Implemented. Each audio file is analyzed (after transcription, in
+parallel with the rest of the pipeline) by `/api/audio-forensics` — Gemini 2.5-pro
+reads the actual audio and returns a structured `AudioForensics` report
+(automated likelihood 0–10, is-pre-recorded conclusion, technical factors,
+personalization analysis for dynamic insertion / AI cloning). Shown in the file
+modal (+ a likelihood badge on the audio thumbnail) and included in every
+download: structured in `manifest.json`, appended in full under each recording in
+`summary.txt`, and as a standalone per-recording `<file> — Forensic Analysis.txt`
+next to the audio. Per-company docs in the case bundle are scoped to that
+company's evidence; the case-wide TCPA evaluation lives only in the root (kept in
+a standalone single-company download, which has no root).

@@ -10,6 +10,7 @@ import {
 import { amrToWavBlob, isAmr } from "@/lib/audio";
 import { formatCaseName } from "@/lib/display";
 import type {
+  AudioForensics,
   Case,
   CaseFile,
   DefendantReport,
@@ -37,12 +38,13 @@ function randomId(): string {
 }
 
 /**
- * Read an image (from its object URL) back as base64 so the evaluator can view
- * the original screenshot directly. Returns null on failure so the caller can
- * fall back to the text description.
+ * Read a file (from its object URL) back as base64 so it can be sent to a model
+ * directly — the original screenshot for the evaluator, or the audio bytes for
+ * forensic analysis. Returns null on failure so the caller can fall back.
  */
-async function imageDataFromUrl(
+async function dataFromUrl(
   url: string,
+  fallbackType: string,
 ): Promise<{ data: string; mediaType: string } | null> {
   try {
     const blob = await fetch(url).then((r) => r.blob());
@@ -55,11 +57,30 @@ async function imageDataFromUrl(
     const comma = dataUrl.indexOf(",");
     const data = dataUrl.slice(comma + 1);
     const mediaType =
-      dataUrl.slice(5, dataUrl.indexOf(";")) || blob.type || "image/png";
+      dataUrl.slice(5, dataUrl.indexOf(";")) || blob.type || fallbackType;
     return data ? { data, mediaType } : null;
   } catch {
     return null;
   }
+}
+
+/** Immutably patch a single file inside a case. */
+function patchFile(
+  cases: Case[],
+  caseId: string,
+  fileId: string,
+  patch: Partial<CaseFile>,
+): Case[] {
+  return cases.map((entry) =>
+    entry.id === caseId
+      ? {
+          ...entry,
+          files: entry.files.map((f) =>
+            f.id === fileId ? { ...f, ...patch } : f,
+          ),
+        }
+      : entry,
+  );
 }
 
 const ENDPOINTS: Record<FileKind, string> = {
@@ -75,6 +96,7 @@ export default function Home() {
   const casesRef = useRef<Case[]>([]);
   const evaluatedRef = useRef<Set<string>>(new Set());
   const identifiedRef = useRef<Set<string>>(new Set());
+  const forensicsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     casesRef.current = cases;
@@ -123,7 +145,7 @@ export default function Home() {
         successful.map(async (file) => {
           const base = { kind: file.kind, name: file.name, text: file.text! };
           if (file.kind === "image") {
-            const image = await imageDataFromUrl(file.url);
+            const image = await dataFromUrl(file.url, "image/png");
             if (image) return { ...base, image };
           }
           return base;
@@ -261,6 +283,75 @@ export default function Home() {
       identifyDefendant(c.id);
     });
   }, [cases, identifyDefendant]);
+
+  // Forensic automation analysis for each audio recording. Runs off the
+  // transcription (independent of evaluation/identification) so the
+  // pre-recorded/automated assessment is ready to file as evidence.
+  const analyzeForensics = useCallback(
+    async (caseId: string, fileId: string) => {
+      const c = casesRef.current.find((entry) => entry.id === caseId);
+      const file = c?.files.find((f) => f.id === fileId);
+      if (!file || file.kind !== "audio" || !file.text) return;
+
+      setCases((prev) =>
+        patchFile(prev, caseId, fileId, { forensicsStatus: "processing" }),
+      );
+
+      try {
+        const audio = await dataFromUrl(file.url, "audio/wav");
+        if (!audio) throw new Error("Could not read audio for analysis.");
+        const response = await fetch("/api/audio-forensics", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            audio,
+            transcription: file.text,
+            name: file.name,
+          }),
+        });
+        if (!response.ok) {
+          const body = (await response.json().catch(() => null)) as
+            | { error?: string }
+            | null;
+          throw new Error(
+            body?.error ?? `Forensic analysis failed: ${response.status}`,
+          );
+        }
+        const forensics = (await response.json()) as AudioForensics;
+        setCases((prev) =>
+          patchFile(prev, caseId, fileId, {
+            forensicsStatus: "done",
+            forensics,
+          }),
+        );
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "Forensic analysis failed";
+        setCases((prev) =>
+          patchFile(prev, caseId, fileId, {
+            forensicsStatus: "error",
+            forensicsError: message,
+          }),
+        );
+      }
+    },
+    [],
+  );
+
+  // Analyze each audio file once its transcription is in.
+  useEffect(() => {
+    cases.forEach((c) => {
+      c.files.forEach((file) => {
+        if (file.kind !== "audio") return;
+        if (file.status !== "done" || !file.text) return;
+        if (file.forensicsStatus) return;
+        const key = `${c.id}:${file.id}`;
+        if (forensicsRef.current.has(key)) return;
+        forensicsRef.current.add(key);
+        void analyzeForensics(c.id, file.id);
+      });
+    });
+  }, [cases, analyzeForensics]);
 
   async function processFile(caseId: string, file: CaseFile, raw: Blob) {
     try {
