@@ -188,7 +188,13 @@ export function getDefendantAgent() {
         instructions: `${INSTRUCTIONS_PREAMBLE}${sop}`,
         tools,
         temperature: 0,
-        stopWhen: stepCountIs(16),
+        // A large case (many files → many phone numbers/brands to search and look
+        // up) can exhaust a tight step budget before the agent writes its final
+        // report, leaving zero candidates. Give it room to search, run sos_lookup,
+        // and still summarize. A confirmed SOS entity is no longer lost when this
+        // cap is hit (see synthesizeCandidateFromSos in the route), but a written
+        // report is still the richer result, so allow more steps.
+        stopWhen: stepCountIs(24),
         // The rate-limit middleware owns retries/backoff.
         maxRetries: 0,
       });
@@ -224,6 +230,166 @@ export async function formatDefendantReport(
     output: Output.object({ schema: defendantReportSchema }),
     system: FORMAT_INSTRUCTIONS,
     prompt: `${fileList}${report}`,
+  });
+  return output;
+}
+
+// --- Enrichment recovery ------------------------------------------------------
+// When the investigation confirms an entity in the Secretary of State registry
+// but its report never carries that entity forward as a company (e.g. it hit the
+// step cap mid-loop), the registry gives us the authoritative filing/service data
+// but NOT the commercial picture — website, goods/services, headcount, revenue,
+// solvability. This pass recovers exactly those fields for one already-confirmed
+// entity, so a synthesized company is not stranded with null enrichment.
+
+/** The commercial fields the registry does not contain, recovered by web research. */
+export const enrichmentSchema = z.object({
+  company_name: z
+    .string()
+    .nullable()
+    .describe("Brand / trade name if it differs from the legal name; null if unknown."),
+  website: z.string().nullable().describe("Primary website URL, or null."),
+  goods_services: z
+    .string()
+    .nullable()
+    .describe("What the company sells or does, or null if not found."),
+  employees_estimate: z
+    .string()
+    .nullable()
+    .describe("Approximate employee count or range, else null."),
+  revenue_estimate: z
+    .string()
+    .nullable()
+    .describe("Approximate annual revenue, else null."),
+  solvability_tier: z
+    .enum(["risk", "good", "whale", "unknown"])
+    .describe("risk = under ~10 employees; good = ~11-50; whale = 50+; unknown if no signal."),
+  business_match: z
+    .boolean()
+    .describe(
+      "True if the company's goods/services plausibly match the case evidence; " +
+        "false if the research shows it is clearly a different kind of business.",
+    ),
+  confidence: z
+    .number()
+    .min(0)
+    .max(1)
+    .describe("Confidence that this commercial picture is correct, 0 to 1."),
+  sources: z.array(z.string()).describe("URLs that support this enrichment."),
+  evidence_files: z
+    .array(z.string())
+    .describe(
+      "Exact filename(s) from the '### File N' headers whose phone number / brand / " +
+        "message point to THIS company. Empty if none can be tied.",
+    ),
+  notes: z.string().nullable().describe("Anything notable or any caveat."),
+});
+
+export type CompanyEnrichment = z.infer<typeof enrichmentSchema>;
+
+const EMPTY_ENRICHMENT: CompanyEnrichment = {
+  company_name: null,
+  website: null,
+  goods_services: null,
+  employees_estimate: null,
+  revenue_estimate: null,
+  solvability_tier: "unknown",
+  business_match: true,
+  confidence: 0.5,
+  sources: [],
+  evidence_files: [],
+  notes: null,
+};
+
+const ENRICHMENT_INSTRUCTIONS = `You are a forensic intake investigator for a consumer-protection law firm.
+
+The firm has ALREADY confirmed a defendant in the official Secretary of State registry — its legal
+entity, state of formation, addresses, and registered agent are established and given to you below.
+Do NOT re-verify that the entity exists; take its identity as ground truth. Your job is to recover the
+COMMERCIAL details the registry does not contain, so the firm can size up the case:
+
+- the company's public website;
+- the goods or services it sells, and whether that plausibly matches the case evidence;
+- an employee-count estimate and an annual-revenue estimate;
+- a solvability rating: risk = under ~10 employees; good = ~11-50; whale = 50+; unknown if no signal;
+- which evidence file(s) (by the phone number, brand, or message they contain) point to this company.
+
+Use the \`web_search\` and \`fetch_page\` tools. Search the legal/brand name, "<name> employees linkedin",
+and "<name> revenue"; fetch the company site to read what it sells; resolve short links with
+\`fetch_page\`. Confirm the business is consistent with the case evidence — if the research shows it is
+clearly a DIFFERENT kind of business than the evidence describes, say so plainly. State anything you
+cannot find as "not found" rather than guessing.
+
+When done, write a short plain-text report stating each field above, your confidence (0 to 1), the
+source URLs, and the exact evidence filename(s) from the "### File N — … — <filename>" headers that
+point to this company.`;
+
+const ENRICHMENT_FORMAT_INSTRUCTIONS = `You convert a forensic investigator's written enrichment note
+into a strict JSON structure, using ONLY facts present in the note — never invent websites, numbers, or
+sources. If a field is not stated, use null (empty array for sources/evidence_files; "unknown" for
+solvability_tier; true for business_match unless the note says it is a different business). For
+\`evidence_files\`, copy filenames verbatim from the "Available evidence files" list below; never invent
+one or include a name not on that list.`;
+
+let cachedEnrichmentAgent:
+  | Promise<ToolLoopAgent<never, typeof enrichmentTools>>
+  | undefined;
+
+// No sos_lookup here: the entity is already confirmed in the registry, so this
+// pass only needs the web to fill in the commercial picture.
+const enrichmentTools = {
+  web_search: webSearchTool,
+  fetch_page: fetchPageTool,
+};
+
+function getEnrichmentAgent() {
+  if (!cachedEnrichmentAgent) {
+    cachedEnrichmentAgent = Promise.resolve(
+      new ToolLoopAgent({
+        model: rateLimitedModel(MODELS.agent),
+        instructions: ENRICHMENT_INSTRUCTIONS,
+        tools: enrichmentTools,
+        temperature: 0,
+        // Bounded: a handful of searches/fetches to size up one known company.
+        stopWhen: stepCountIs(10),
+        maxRetries: 0,
+      }),
+    );
+  }
+  return cachedEnrichmentAgent;
+}
+
+/**
+ * Recover the commercial fields (website, goods/services, headcount, revenue,
+ * solvability, evidence attribution) for ONE entity already confirmed in the
+ * Secretary of State registry. `sosContext` is a plain-text summary of that
+ * record; `fileBlocks` is the same case evidence the main agent saw, so the pass
+ * can confirm the business match and attribute files. Returns an empty
+ * enrichment when the agent produced nothing, so callers never handle a missing
+ * result.
+ */
+export async function enrichConfirmedEntity(params: {
+  sosContext: string;
+  fileBlocks: string;
+  fileNames: string[];
+}): Promise<CompanyEnrichment> {
+  const agent = await getEnrichmentAgent();
+  const result = await agent.generate({
+    prompt: `CONFIRMED ENTITY (from the Secretary of State registry — treat as ground truth):\n${params.sosContext}\n\n--- CASE EVIDENCE ---\n${params.fileBlocks}\n\nRecover this confirmed company's commercial details per your instructions.`,
+  });
+  if (!result.text.trim()) return EMPTY_ENRICHMENT;
+  const fileList = params.fileNames.length
+    ? `Available evidence files (use these exact names for evidence_files):\n${params.fileNames
+        .map((name) => `- ${name}`)
+        .join("\n")}\n\n--- ENRICHMENT NOTE ---\n`
+    : "";
+  const { output } = await generateText({
+    model: rateLimitedModel(MODELS.agent),
+    maxRetries: 0,
+    temperature: 0,
+    output: Output.object({ schema: enrichmentSchema }),
+    system: ENRICHMENT_FORMAT_INSTRUCTIONS,
+    prompt: `${fileList}${result.text}`,
   });
   return output;
 }

@@ -1,6 +1,8 @@
 import { z } from "zod";
 import {
+  type CompanyEnrichment,
   type DefendantCandidate,
+  enrichConfirmedEntity,
   formatDefendantReport,
   getDefendantAgent,
 } from "@/lib/agents/defendant-agent";
@@ -9,6 +11,7 @@ import {
   type SosEntity,
   type SosLookupResult,
 } from "@/lib/agents/defendant-tools";
+import { joinAddress, recordLabel } from "@/lib/display";
 import { getJob, startJob } from "@/lib/jobs";
 import { type Logger, createLogger, nextRequestId } from "@/lib/logger";
 import { isRateLimitError } from "@/lib/rate-limit";
@@ -135,6 +138,168 @@ type CandidateWithSos = DefendantCandidate & {
   sos_records: SosEntity[];
   fl_check: FlCheckStatus;
 };
+
+/**
+ * Cluster official records that describe the SAME company so each company is
+ * synthesized once. A company's home registration and its Florida foreign
+ * registration share a legal name but are distinct records — both belong to one
+ * company. Records with no entity name fall into their own singleton group.
+ */
+function groupByCompany(entities: SosEntity[]): SosEntity[][] {
+  const groups: SosEntity[][] = [];
+  for (const entity of entities) {
+    const group = groups.find((g) =>
+      g.some(
+        (e) =>
+          !!e.entityName &&
+          !!entity.entityName &&
+          namesMatch(e.entityName, entity.entityName),
+      ),
+    );
+    if (group) group.push(entity);
+    else groups.push([entity]);
+  }
+  return groups;
+}
+
+/**
+ * Build a candidate straight from confirmed Secretary of State records when the
+ * investigator's report never tied them to a company. A registry-confirmed
+ * entity IS a real defendant — the most authoritative output the investigation
+ * has — so it must stand up its own company (and its own download folder) rather
+ * than being stranded as an "official record" with no company attached. This is
+ * what closes the gap where the SOS lookup found an entity but the UI said "no
+ * companies identified" and the export produced no company folder.
+ *
+ * `records` are the official record(s) for ONE entity (its home registration
+ * plus any Florida foreign one), ordered home-first. The registry supplies the
+ * authoritative filing/service fields (legal name, state, addresses, agent);
+ * `enrichment` (when present) supplies the commercial fields the registry lacks —
+ * website, goods/services, headcount, revenue, solvability — recovered by the
+ * enrichment pass. `evidenceFileNames` ties the case's evidence to the company so
+ * the defendant and its proof land together.
+ */
+function synthesizeCandidateFromSos(
+  records: SosEntity[],
+  evidenceFileNames: string[],
+  flOutcomeByName: Map<string, FlOutcome>,
+  enrichment: CompanyEnrichment | null,
+): CandidateWithSos {
+  const home = records[0];
+  // The firm serves in Florida, so prefer the FL registration's agent when present.
+  const agentRecord = records.find(isFlorida) ?? home;
+  const legalName = home.entityName?.trim() || "Unknown entity";
+  const principal =
+    joinAddress([
+      home.principalAddress,
+      home.principalCity,
+      home.principalState,
+      home.principalZip,
+    ]) ??
+    joinAddress([
+      home.mailingAddress,
+      home.mailingCity,
+      home.mailingState,
+      home.mailingZip,
+    ]);
+  const hasAgent =
+    !!agentRecord.registeredAgentName ||
+    !!agentRecord.registeredAgentAddress ||
+    !!agentRecord.registeredAgentState;
+  const registeredAgent = hasAgent
+    ? {
+        name: agentRecord.registeredAgentName ?? null,
+        address: joinAddress([
+          agentRecord.registeredAgentAddress,
+          agentRecord.registeredAgentCity,
+          agentRecord.registeredAgentState,
+          agentRecord.registeredAgentZip,
+        ]),
+        state: agentRecord.registeredAgentState ?? null,
+      }
+    : null;
+  // Source URLs: the official filing(s) plus anything the enrichment relied on.
+  const sources = Array.from(
+    new Set([
+      ...records
+        .map((r) => r.sosUrl)
+        .filter((u): u is string => typeof u === "string" && u.length > 0),
+      ...(enrichment?.sources ?? []),
+    ]),
+  );
+  const baseNote =
+    "Identified from the Secretary of State record: this entity was confirmed in " +
+    "the official registry, but the investigator's written report did not tie it " +
+    "to a company, so it is surfaced here directly from the authoritative record.";
+  // Warn the intaker when the enrichment research suggests this entity's business
+  // does not line up with the case evidence — that is a flag to verify, not file.
+  const mismatchNote =
+    enrichment && !enrichment.business_match
+      ? " ⚠ Web research suggests this entity's business may NOT match the case " +
+        "evidence — verify the company before filing."
+      : "";
+  const notes =
+    [baseNote + mismatchNote, enrichment?.notes?.trim()]
+      .filter(Boolean)
+      .join(" ") || null;
+  return {
+    // Prefer the brand/trade name the enrichment found; fall back to the legal name.
+    company_name: enrichment?.company_name?.trim() || legalName,
+    legal_name: legalName,
+    website: enrichment?.website ?? null,
+    goods_services: enrichment?.goods_services ?? null,
+    state_of_incorporation: home.jurisdiction ?? home.searchState ?? null,
+    hq_mailing_address: principal,
+    registered_agent: registeredAgent,
+    employees_estimate: enrichment?.employees_estimate ?? null,
+    revenue_estimate: enrichment?.revenue_estimate ?? null,
+    solvability_tier: enrichment?.solvability_tier ?? "unknown",
+    // The entity itself is registry-confirmed; the enrichment's confidence reflects
+    // how well the commercial picture matches. Absent enrichment, keep it modest.
+    confidence: enrichment?.confidence ?? 0.5,
+    sources,
+    evidence_files: evidenceFileNames,
+    notes,
+    sos_records: records,
+    fl_check: flCheckStatus(records, flOutcomeByName),
+  };
+}
+
+/** Compact plain-text summary of a company's official record(s) for the enrichment pass. */
+function sosContextFor(records: SosEntity[]): string {
+  return records
+    .map((r) => {
+      const principal = joinAddress([
+        r.principalAddress,
+        r.principalCity,
+        r.principalState,
+        r.principalZip,
+      ]);
+      const agent = joinAddress([
+        r.registeredAgentName,
+        r.registeredAgentAddress,
+        r.registeredAgentCity,
+        r.registeredAgentState,
+        r.registeredAgentZip,
+      ]);
+      const officers = (r.officers ?? [])
+        .map((o) => [o.title, o.name].filter(Boolean).join(" "))
+        .filter(Boolean)
+        .join("; ");
+      return [
+        `Record (${recordLabel(r)}):`,
+        `  Legal name: ${r.entityName ?? "—"}`,
+        `  State of formation: ${r.jurisdiction ?? r.searchState ?? "—"}`,
+        `  Status: ${r.status ?? "—"}`,
+        `  Principal address: ${principal ?? "—"}`,
+        `  Registered agent: ${agent ?? "—"}`,
+        officers ? `  Officers: ${officers}` : "",
+      ]
+        .filter(Boolean)
+        .join("\n");
+    })
+    .join("\n");
+}
 
 // The investigation payload the client ultimately renders. It's produced by the
 // background job and handed back through a status poll, never returned directly
@@ -373,19 +538,85 @@ async function runInvestigation(
     });
     const unmatchedEntities = foundEntities.filter((e) => !usedEntities.has(e));
 
+    // Promote every registry-confirmed entity the investigator never wrote up as
+    // a company into a real candidate, built straight from the authoritative
+    // record. Without this, an entity the `sos_lookup` tool confirmed would show
+    // as an orphan "official record" with no company and no download folder —
+    // exactly the "no companies identified, yet the SOS lookup found one"
+    // contradiction. Records for the same entity (home + FL foreign) group into
+    // one company.
+    const unmatchedGroups = groupByCompany(unmatchedEntities);
+    // Only when the whole case resolves to a single synthesized company (no
+    // attributed candidates, one entity) do we hand it all the case evidence, so
+    // the company and its proof land together. With multiple companies in play we
+    // cannot responsibly attribute the files, so leave its evidence empty rather
+    // than duplicate it across folders.
+    const soleCompany =
+      candidatesWithSos.length === 0 && unmatchedGroups.length === 1;
+    const allFileNames = files.map((f) => f.name);
+    const synthesizedCandidates = await Promise.all(
+      unmatchedGroups.map(async (group) => {
+        const records = orderRecords(group);
+        // Recover the commercial picture the registry doesn't hold (website,
+        // goods/services, headcount, revenue, solvability) for this confirmed
+        // entity. Best-effort: a failed or rate-limited enrichment must never drop
+        // the company — we fall back to the registry-only synthesis.
+        let enrichment: CompanyEnrichment | null = null;
+        if (records[0]?.entityName?.trim()) {
+          const doneEnrich = log.start("agent.enrich");
+          try {
+            enrichment = await enrichConfirmedEntity({
+              sosContext: sosContextFor(records),
+              fileBlocks,
+              fileNames: allFileNames,
+            });
+            doneEnrich({
+              company: records[0].entityName,
+              solvability: enrichment.solvability_tier,
+              businessMatch: enrichment.business_match,
+            });
+          } catch (err) {
+            log.warn("enrichment failed; using registry-only synthesis", {
+              company: records[0].entityName,
+              message: err instanceof Error ? err.message : String(err),
+            });
+          }
+        }
+        // Prefer the enrichment's own file attribution; otherwise fall back to the
+        // whole case only when this is the sole company.
+        const attributed = (enrichment?.evidence_files ?? []).filter((name) =>
+          knownFileNames.has(name),
+        );
+        const evidenceFileNames = attributed.length
+          ? attributed
+          : soleCompany
+            ? allFileNames
+            : [];
+        return synthesizeCandidateFromSos(
+          records,
+          evidenceFileNames,
+          flOutcomeByName,
+          enrichment,
+        );
+      }),
+    );
+    const allCandidates = [...candidatesWithSos, ...synthesizedCandidates];
+
     log.info("sos lookups summarized", {
       attempts: sosResults.length,
       flCrossLookups: flResults.length,
       found: foundEntities.length,
       attached: foundEntities.length - unmatchedEntities.length,
+      synthesized: synthesizedCandidates.length,
       errors: sosErrors.length,
     });
 
     return {
-      candidates: candidatesWithSos,
+      candidates: allCandidates,
       search_terms_used: report.search_terms_used ?? [],
       sos_records: foundEntities,
-      unmatched_sos_records: unmatchedEntities,
+      // Every confirmed entity is now a candidate, so nothing is left orphaned.
+      unmatched_sos_records: [],
       // Surface SOS trouble only when nothing came back, so a single bad
       // state guess alongside a good hit doesn't raise a false alarm.
       sos_error:
