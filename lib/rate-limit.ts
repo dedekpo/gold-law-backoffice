@@ -4,9 +4,15 @@ type Task<T> = () => Promise<T>;
 
 const log = createLogger("rate-limit");
 
-const MAX_CONCURRENT = Number(process.env.GATEWAY_MAX_CONCURRENT ?? 3);
+// Defaults are sized for a PAID Google tier (billing enabled / Vertex AI),
+// whose per-minute quota is far higher than the free tier. Keeping the limiter
+// generous lets a batch of files flow through quickly so each request gets a
+// slot fast and returns before any platform proxy times it out. All values are
+// env-tunable — if you run on the free tier again, drop these back (e.g.
+// GATEWAY_MAX_CONCURRENT=3, GATEWAY_RATE_LIMIT=8) to avoid 429/503s.
+const MAX_CONCURRENT = Number(process.env.GATEWAY_MAX_CONCURRENT ?? 6);
 const RATE_WINDOW_MS = Number(process.env.GATEWAY_RATE_WINDOW_MS ?? 60_000);
-const RATE_LIMIT = Number(process.env.GATEWAY_RATE_LIMIT ?? 8);
+const RATE_LIMIT = Number(process.env.GATEWAY_RATE_LIMIT ?? 30);
 const MAX_RETRIES = Number(process.env.GATEWAY_MAX_RETRIES ?? 6);
 const BASE_BACKOFF_MS = Number(process.env.GATEWAY_BASE_BACKOFF_MS ?? 4000);
 const MAX_BACKOFF_MS = Number(process.env.GATEWAY_MAX_BACKOFF_MS ?? 60_000);

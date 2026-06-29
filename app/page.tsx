@@ -97,6 +97,32 @@ const DEFENDANT_MAX_POLL_FAILURES = 10;
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+// Bound how many transcription/forensics requests are in flight to the server at
+// once. Each is a held HTTP request, so a big upload (e.g. 28 files → ~56 calls)
+// fired all at once makes later requests sit in the server's rate-limit queue
+// long enough for a platform proxy to cut them with a 502. A small client gate
+// keeps every request short by never over-queuing the server.
+const MAX_CONCURRENT_MEDIA_REQUESTS = 4;
+
+function createLimiter(max: number) {
+  let active = 0;
+  const waiters: Array<() => void> = [];
+  return async function limit<T>(task: () => Promise<T>): Promise<T> {
+    if (active >= max) {
+      await new Promise<void>((resolve) => waiters.push(resolve));
+    }
+    active++;
+    try {
+      return await task();
+    } finally {
+      active--;
+      waiters.shift()?.();
+    }
+  };
+}
+
+const mediaLimiter = createLimiter(MAX_CONCURRENT_MEDIA_REQUESTS);
+
 export default function Home() {
   const [cases, setCases] = useState<Case[]>([]);
   const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
@@ -413,7 +439,7 @@ export default function Home() {
         const key = `${c.id}:${file.id}`;
         if (forensicsRef.current.has(key)) return;
         forensicsRef.current.add(key);
-        void analyzeForensics(c.id, file.id);
+        void mediaLimiter(() => analyzeForensics(c.id, file.id));
       });
     });
   }, [cases, analyzeForensics]);
@@ -505,7 +531,7 @@ export default function Home() {
     setCases((prev) => [...prev, newCase]);
     setSelectedCaseId(caseId);
     built.forEach(({ file, raw }) => {
-      void processFile(caseId, file, raw);
+      void mediaLimiter(() => processFile(caseId, file, raw));
     });
   }
 
