@@ -149,6 +149,8 @@ export type Case = {
   evaluation?: Evaluation;
   evaluationError?: string;
   defendantStatus: DefendantStatus;
+  /** Id of the background investigation job, set while it is running/polling. */
+  defendantJobId?: string;
   defendants?: DefendantCandidate[];
   defendantError?: string;
   defendantSosError?: string;

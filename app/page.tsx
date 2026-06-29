@@ -88,6 +88,15 @@ const ENDPOINTS: Record<FileKind, string> = {
   image: "/api/image-description",
 };
 
+// Defendant identification runs as a background job we poll for. Polling every
+// few seconds keeps each request short (so a proxy can't time it out), and we
+// tolerate a run of failed polls before giving up so a transient network/proxy
+// blip doesn't abandon a job that is still running on the server.
+const DEFENDANT_POLL_INTERVAL_MS = 3000;
+const DEFENDANT_MAX_POLL_FAILURES = 10;
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 export default function Home() {
   const [cases, setCases] = useState<Case[]>([]);
   const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
@@ -215,7 +224,9 @@ export default function Home() {
     );
 
     try {
-      const response = await fetch("/api/defendant-identification", {
+      // Start the investigation as a background job. This POST returns a job id
+      // in well under a second, so it can't be cut by a proxy timeout.
+      const startRes = await fetch("/api/defendant-identification", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -233,24 +244,78 @@ export default function Home() {
             : undefined,
         }),
       });
-      if (!response.ok) {
-        const body = (await response.json().catch(() => null)) as
+      if (!startRes.ok) {
+        const body = (await startRes.json().catch(() => null)) as
           | { error?: string }
           | null;
         throw new Error(
-          body?.error ?? `Identification failed: ${response.status}`,
+          body?.error ?? `Identification failed: ${startRes.status}`,
         );
       }
-      const report = (await response.json()) as DefendantReport;
+      const { jobId } = (await startRes.json()) as { jobId: string };
+      setCases((prev) =>
+        prev.map((entry) =>
+          entry.id === caseId ? { ...entry, defendantJobId: jobId } : entry,
+        ),
+      );
+
+      // Poll until the job reaches a terminal state. A failed poll (dropped
+      // connection, a brief 5xx from the proxy) is retried rather than treated
+      // as failure, so the still-running job is never abandoned.
+      let pollFailures = 0;
+      let report: DefendantReport | null = null;
+      while (!report) {
+        await sleep(DEFENDANT_POLL_INTERVAL_MS);
+
+        let pollRes: Response;
+        try {
+          pollRes = await fetch(
+            `/api/defendant-identification?jobId=${encodeURIComponent(jobId)}`,
+          );
+        } catch {
+          if (++pollFailures > DEFENDANT_MAX_POLL_FAILURES) {
+            throw new Error("Lost connection while identifying the company.");
+          }
+          continue;
+        }
+
+        if (pollRes.status === 404) {
+          throw new Error(
+            "Investigation expired on the server. Please run it again.",
+          );
+        }
+        if (!pollRes.ok) {
+          // Transient proxy/server error — retry on the next tick.
+          if (++pollFailures > DEFENDANT_MAX_POLL_FAILURES) {
+            throw new Error("Lost connection while identifying the company.");
+          }
+          continue;
+        }
+
+        pollFailures = 0;
+        const data = (await pollRes.json().catch(() => null)) as
+          | { status: "running" }
+          | { status: "done"; report: DefendantReport }
+          | { status: "error"; error?: string }
+          | null;
+
+        if (!data || data.status === "running") continue;
+        if (data.status === "error") {
+          throw new Error(data.error ?? "Identification failed");
+        }
+        report = data.report;
+      }
+
+      const finalReport = report;
       setCases((prev) =>
         prev.map((entry) =>
           entry.id === caseId
             ? {
                 ...entry,
                 defendantStatus: "done",
-                defendants: report.candidates,
-                defendantSosError: report.sos_error,
-                defendantUnmatchedSos: report.unmatched_sos_records,
+                defendants: finalReport.candidates,
+                defendantSosError: finalReport.sos_error,
+                defendantUnmatchedSos: finalReport.unmatched_sos_records,
                 completedAt: Date.now(),
               }
             : entry,

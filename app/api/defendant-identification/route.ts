@@ -9,7 +9,8 @@ import {
   type SosEntity,
   type SosLookupResult,
 } from "@/lib/agents/defendant-tools";
-import { createLogger, nextRequestId } from "@/lib/logger";
+import { getJob, startJob } from "@/lib/jobs";
+import { type Logger, createLogger, nextRequestId } from "@/lib/logger";
 import { isRateLimitError } from "@/lib/rate-limit";
 
 const baseLog = createLogger("defendant-id");
@@ -135,6 +136,17 @@ type CandidateWithSos = DefendantCandidate & {
   fl_check: FlCheckStatus;
 };
 
+// The investigation payload the client ultimately renders. It's produced by the
+// background job and handed back through a status poll, never returned directly
+// from the POST that starts the work.
+type DefendantResponse = {
+  candidates: CandidateWithSos[];
+  search_terms_used: string[];
+  sos_records: SosEntity[];
+  unmatched_sos_records: SosEntity[];
+  sos_error?: string;
+};
+
 const fileSchema = z.object({
   kind: z.enum(["audio", "image"]),
   name: z.string(),
@@ -152,13 +164,16 @@ const requestSchema = z.object({
     .optional(),
 });
 
-// The agent loops through several search/fetch round-trips, and a single slow
-// Secretary of State scrape can now hold for up to 5 minutes (see
-// SOS_LOOKUP_TIMEOUT_MS). Give the route generous headroom so a slow lookup
-// isn't killed mid-flight. NOTE: hosted platforms cap function duration by plan
-// (e.g. Vercel) — this value is only honored where the platform allows it.
-export const maxDuration = 800;
+// The investigation can run for ~10 minutes. Rather than hold one HTTP request
+// open that long (a platform proxy such as Railway's will cut it with a 502 and
+// orphan the result), POST starts the work as a background job and returns a job
+// id immediately; the client polls GET ?jobId=… for the result. `maxDuration`
+// only bounds the (now sub-second) POST/GET handlers themselves — the background
+// job keeps running in the long-lived Node process regardless.
+export const maxDuration = 60;
 
+// POST starts the investigation and returns a job id right away. Because the
+// response is immediate, no proxy can time the request out mid-investigation.
 export async function POST(request: Request) {
   const log = baseLog.child(nextRequestId());
   const parsed = requestSchema.safeParse(await request.json());
@@ -169,7 +184,47 @@ export async function POST(request: Request) {
     return Response.json({ error: "Invalid request body" }, { status: 400 });
   }
 
-  const { files, evaluation } = parsed.data;
+  const jobId = startJob(() => runInvestigation(parsed.data, log), {
+    isRateLimited: isRateLimitError,
+  });
+  log.info("investigation queued", { jobId });
+  return Response.json({ jobId }, { status: 202 });
+}
+
+// GET ?jobId=… reports the status of a queued investigation. Each poll is a
+// fast, self-contained request, so a dropped connection mid-investigation is no
+// longer fatal — the result is delivered whenever the client next polls.
+export async function GET(request: Request) {
+  const jobId = new URL(request.url).searchParams.get("jobId");
+  if (!jobId) {
+    return Response.json({ error: "Missing jobId" }, { status: 400 });
+  }
+  const job = getJob<DefendantResponse>(jobId);
+  if (!job) {
+    return Response.json(
+      { error: "Unknown or expired investigation. Please run it again." },
+      { status: 404 },
+    );
+  }
+  if (job.status === "done") {
+    return Response.json({ status: "done", report: job.result });
+  }
+  if (job.status === "error") {
+    return Response.json({
+      status: "error",
+      error: job.rateLimited
+        ? "AI gateway rate limit exceeded. Please wait a moment and try again."
+        : job.error,
+      rateLimited: job.rateLimited,
+    });
+  }
+  return Response.json({ status: "running" });
+}
+
+async function runInvestigation(
+  { files, evaluation }: z.infer<typeof requestSchema>,
+  log: Logger,
+): Promise<DefendantResponse> {
   log.info("request received", {
     files: files.length,
     kinds: files.map((f) => f.kind).join(","),
@@ -326,7 +381,7 @@ export async function POST(request: Request) {
       errors: sosErrors.length,
     });
 
-    return Response.json({
+    return {
       candidates: candidatesWithSos,
       search_terms_used: report.search_terms_used ?? [],
       sos_records: foundEntities,
@@ -337,24 +392,21 @@ export async function POST(request: Request) {
         foundEntities.length === 0 && sosErrors.length > 0
           ? sosErrors[0]
           : undefined,
-    });
+    };
   } catch (err) {
+    // The POST has already returned; the job store records this failure and the
+    // client surfaces it on its next poll. We only log here so the cause stays
+    // visible in the server console.
     if (isRateLimitError(err)) {
       log.error("failed: gateway rate limit exceeded (429)");
-      return Response.json(
-        {
-          error:
-            "AI gateway rate limit exceeded. Please wait a moment and try again.",
-        },
-        { status: 429 },
-      );
+    } else {
+      const message =
+        err instanceof Error ? err.message : "Defendant identification failed";
+      log.error("failed: agent threw", {
+        message,
+        name: err instanceof Error ? err.name : typeof err,
+      });
     }
-    const message =
-      err instanceof Error ? err.message : "Defendant identification failed";
-    log.error("failed: agent threw", {
-      message,
-      name: err instanceof Error ? err.name : typeof err,
-    });
-    return Response.json({ error: message }, { status: 500 });
+    throw err;
   }
 }

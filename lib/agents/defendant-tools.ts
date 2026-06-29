@@ -2,6 +2,7 @@ import { generateText, tool } from "ai";
 import { z } from "zod";
 import { createLogger } from "@/lib/logger";
 import { MODELS, google } from "@/lib/provider";
+import { isRateLimitError } from "@/lib/rate-limit";
 import { rateLimitedModel } from "./model";
 
 const log = createLogger("defendant-tools");
@@ -82,7 +83,15 @@ export const webSearchTool = tool({
         query,
         message: err instanceof Error ? err.message : String(err),
       });
-      throw err;
+      // A rate limit (429) is worth failing the whole run for — the user should
+      // retry once the window clears rather than receive a half-searched report.
+      // Any other failure (a 5xx that exhausted retries, a network blip) is
+      // returned like `fetch_page` does, so one bad search can't abort the
+      // investigation: the agent can try a different query or finish with what
+      // it already has.
+      if (isRateLimitError(err)) throw err;
+      const message = err instanceof Error ? err.message : "Search failed";
+      return { error: message, answer: "", sources: [] as string[] };
     }
   },
 });
