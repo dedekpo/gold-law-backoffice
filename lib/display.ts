@@ -119,27 +119,42 @@ export function preferredServiceRecord(records: SosEntity[]): SosEntity | null {
 /**
  * The originating evidence to show for one company: the case files the agent
  * attributed to it (matched by filename). When the agent couldn't attribute any
- * file (older data, or a single obvious file), fall back to all of the case's
- * files so proof is never hidden — `attributed` tells the caller which case it is
- * so the UI can label the fallback honestly.
+ * file, fall back so proof is never hidden — but only to files no OTHER company
+ * claimed, never to evidence that belongs to a sibling. `attributed` tells the
+ * caller which case it is so the UI can label the fallback honestly.
+ *
+ * Two guards keep the fallback honest:
+ * - A registry-only `synthesized` company never falls back: it was surfaced from
+ *   the Secretary of State record, not from the evidence, so claiming the case's
+ *   voicemails/screenshots as its proof would be misleading.
+ * - The fallback excludes files attributed to any other candidate in
+ *   `allCandidates`, so an unattributed company doesn't appear to own a sibling's
+ *   evidence. With no siblings (a single-company case) this is the whole case —
+ *   the original "don't hide the proof" intent.
  */
 export function candidateEvidence(
   caseFiles: CaseFile[],
   candidate: DefendantCandidate,
-  options?: { fallback?: boolean },
+  options?: { fallback?: boolean; allCandidates?: DefendantCandidate[] },
 ): { files: CaseFile[]; attributed: boolean } {
   const names = new Set(candidate.evidence_files ?? []);
   const matched = names.size
     ? caseFiles.filter((file) => names.has(file.name))
     : [];
   if (matched.length > 0) return { files: matched, attributed: true };
-  // Nothing could be attributed. By default fall back to the whole case so proof
-  // is never hidden (single-company download / the card). Callers that file each
-  // company's evidence separately (the case bundle) pass `fallback: false`, so
-  // unattributed files are routed to their own folder instead of being copied
-  // into every company.
+  // Callers that file each company's evidence separately (the case bundle) pass
+  // `fallback: false`, so unattributed files are routed to their own folder.
   if (options?.fallback === false) return { files: [], attributed: false };
-  return { files: caseFiles, attributed: false };
+  // A registry-only company has no claim on the evidence — show nothing.
+  if (candidate.synthesized) return { files: [], attributed: false };
+  // Otherwise fall back only to files no other company attributed.
+  const claimedByOthers = new Set(
+    (options?.allCandidates ?? [])
+      .filter((c) => c !== candidate)
+      .flatMap((c) => c.evidence_files ?? []),
+  );
+  const orphans = caseFiles.filter((file) => !claimedByOthers.has(file.name));
+  return { files: orphans, attributed: false };
 }
 
 export function formatCaseName(date: Date, suffix?: string): string {

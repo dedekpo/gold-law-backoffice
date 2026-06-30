@@ -202,8 +202,27 @@ function EvidenceStrip({
   candidate: DefendantCandidate;
   onOpenFile: (file: CaseFile) => void;
 }) {
-  const { files, attributed } = candidateEvidence(caseItem.files, candidate);
-  if (files.length === 0) return null;
+  const { files, attributed } = candidateEvidence(caseItem.files, candidate, {
+    allCandidates: caseItem.defendants,
+  });
+  if (files.length === 0) {
+    // A registry-only company legitimately has no evidence tied to it — say so
+    // plainly rather than hiding the section (which would look like a glitch).
+    if (candidate.synthesized) {
+      return (
+        <div className="mt-4 border-t border-zinc-200 pt-4 dark:border-zinc-800">
+          <p className="mb-1 text-[10px] uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+            Originating evidence
+          </p>
+          <p className="text-[11px] text-zinc-400 dark:text-zinc-500">
+            No specific evidence tied to this company — it was surfaced from the
+            Secretary of State record, not from the case files.
+          </p>
+        </div>
+      );
+    }
+    return null;
+  }
   return (
     <div className="mt-4 border-t border-zinc-200 pt-4 dark:border-zinc-800">
       <p className="mb-2 text-[10px] uppercase tracking-wide text-zinc-500 dark:text-zinc-400">

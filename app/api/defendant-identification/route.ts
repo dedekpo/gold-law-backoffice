@@ -137,6 +137,8 @@ function flCheckStatus(
 type CandidateWithSos = DefendantCandidate & {
   sos_records: SosEntity[];
   fl_check: FlCheckStatus;
+  // Set on candidates built from a registry record alone (synthesizeCandidateFromSos).
+  synthesized?: boolean;
 };
 
 /**
@@ -262,6 +264,9 @@ function synthesizeCandidateFromSos(
     notes,
     sos_records: records,
     fl_check: flCheckStatus(records, flOutcomeByName),
+    // Surfaced from the registry, not the evidence — so the UI/export must not
+    // fall back to claiming the case's files as this company's proof.
+    synthesized: true,
   };
 }
 

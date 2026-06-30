@@ -126,6 +126,11 @@ export type DefendantCandidate = {
   sos_records?: SosEntity[];
   // Outcome of the Florida cross-lookup, so the UI can show FL was checked.
   fl_check?: FlCheckStatus;
+  // True when this company was surfaced purely from a Secretary of State record
+  // (the investigator never tied it to the evidence). Such a company must NOT
+  // claim the case's evidence as its proof — it came from the registry, not the
+  // files. See candidateEvidence.
+  synthesized?: boolean;
 };
 
 export type DefendantReport = {

@@ -149,11 +149,10 @@ export function buildCompanyManifest(
   candidate: DefendantCandidate,
   options?: { fallback?: boolean; includeEvaluation?: boolean },
 ): CompanyManifest {
-  const { files, attributed } = candidateEvidence(
-    caseItem.files,
-    candidate,
-    options,
-  );
+  const { files, attributed } = candidateEvidence(caseItem.files, candidate, {
+    ...options,
+    allCandidates: caseItem.defendants,
+  });
   const manifest: CompanyManifest = {
     generatedAt: new Date().toISOString(),
     case: { id: caseItem.id, name: caseItem.name },
@@ -483,7 +482,9 @@ export async function buildCompanyZip(
   candidate: DefendantCandidate,
 ): Promise<Blob> {
   const manifest = buildCompanyManifest(caseItem, candidate);
-  const { files } = candidateEvidence(caseItem.files, candidate);
+  const { files } = candidateEvidence(caseItem.files, candidate, {
+    allCandidates: caseItem.defendants,
+  });
   const entries: Zippable = {
     "manifest.json": strToU8(JSON.stringify(manifest, null, 2)),
     "summary.txt": strToU8(companySummaryText(manifest)),
