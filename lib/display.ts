@@ -1,7 +1,14 @@
 // Pure presentation helpers shared across the case UI: label maps, score tones,
 // and small formatters for Secretary of State records. No JSX, no state.
 
-import type { CaseFile, DefendantCandidate, SosEntity } from "./types";
+import type {
+  Band,
+  CaseFile,
+  DefendantCandidate,
+  ScreenId,
+  SosEntity,
+  Track,
+} from "./types";
 
 export const CATEGORY_LABELS: Record<string, string> = {
   prerecorded_voicemail: "Pre-recorded voicemail",
@@ -69,6 +76,91 @@ export function scoreTone(score: number): ScoreTone {
     dot: "bg-red-500",
     label: "Violation",
   };
+}
+
+// --- TCPA IQ bands, screens, tracks (see docs/scoring-spec.md) ---------------
+
+export const BAND_LABELS: Record<Band, string> = {
+  priority: "Priority",
+  solid: "Solid",
+  marginal: "Marginal",
+  pass: "Pass",
+};
+
+export const SCREEN_LABELS: Record<ScreenId, string> = {
+  prerecorded_voice: "Prerecorded voice",
+  failure_to_stop: "Failure to stop (IDNC)",
+  quiet_hours: "Quiet hours",
+  dnc_registry: "Do-Not-Call registry",
+};
+
+export const TRACK_LABELS: Record<Track, string> = {
+  tcpa: "TCPA",
+  debt_collection: "Debt collection",
+};
+
+/**
+ * Plain-language explanation of each scorecard factor, keyed by `ScoreFactor.name`
+ * (see docs/scoring-spec.md §3). Surfaced as tooltips on the company scorecard.
+ */
+export const FACTOR_TOOLTIPS: Record<string, string> = {
+  "Claim Type":
+    "The strongest legal theory in the evidence (prerecorded voice · failure-to-stop · quiet hours · DNC), plus a bonus for stacking multiple theories. Max 24.",
+  Collectability:
+    "Whether the defendant can actually pay a judgment — based on employee count, revenue, and public-company status. Max 24.",
+  Willfulness:
+    "Signs the violation was deliberate (ignored a STOP, known repeat offender) — this is what can treble the damages. Max 18.",
+  Volume:
+    "How many violating contacts are attributed to this company. More contacts = more statutory damages. Max 16.",
+  Identifiability:
+    "How readily the entity can be sued and served — a Florida nexus scores highest, forum friction lowest. Max 10.",
+  Defensibility:
+    "How hard the defendant can argue the consumer consented — a clean cold contact scores highest, an established relationship lowest. Max 8.",
+};
+
+// Worst → best, for picking a case's headline band across its companies.
+const BAND_ORDER: Band[] = ["pass", "marginal", "solid", "priority"];
+
+/** The strongest band among a set (e.g. a case's companies), or null if empty. */
+export function bestBand(bands: Band[]): Band | null {
+  if (bands.length === 0) return null;
+  return bands.reduce((best, b) =>
+    BAND_ORDER.indexOf(b) > BAND_ORDER.indexOf(best) ? b : best,
+  );
+}
+
+/** Tone for a band chip: priority = go (green), down to pass = muted. */
+export function bandTone(band: Band): ScoreTone {
+  switch (band) {
+    case "priority":
+      return {
+        chip: "bg-emerald-100 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-200",
+        ring: "ring-emerald-500/50",
+        dot: "bg-emerald-500",
+        label: "Priority",
+      };
+    case "solid":
+      return {
+        chip: "bg-sky-100 text-sky-900 dark:bg-sky-950 dark:text-sky-200",
+        ring: "ring-sky-500/50",
+        dot: "bg-sky-500",
+        label: "Solid",
+      };
+    case "marginal":
+      return {
+        chip: "bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200",
+        ring: "ring-amber-500/50",
+        dot: "bg-amber-500",
+        label: "Marginal",
+      };
+    default:
+      return {
+        chip: "bg-zinc-100 text-zinc-700 dark:bg-zinc-900 dark:text-zinc-300",
+        ring: "ring-zinc-400/40",
+        dot: "bg-zinc-400 dark:bg-zinc-600",
+        label: "Pass",
+      };
+  }
 }
 
 export function categoryLabel(category: string): string {

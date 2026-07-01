@@ -5,7 +5,7 @@
 export type FileKind = "audio" | "image";
 export type FileStatus = "processing" | "done" | "error";
 
-export type EvaluationStatus = "idle" | "evaluating" | "done" | "error";
+export type ScreeningStatus = "idle" | "evaluating" | "done" | "error";
 export type DefendantStatus = "idle" | "identifying" | "done" | "error";
 
 /** One factor supporting the forensic automation assessment. */
@@ -48,14 +48,173 @@ export type CaseFile = {
   forensicsError?: string;
 };
 
-/** The TCPA rubric evaluation for a case. */
-export type Evaluation = {
-  score: number;
-  category: string;
-  message_type: string;
-  needs_external_check: string[];
-  reasoning: string;
+// ---------------------------------------------------------------------------
+// Screening & scoring domain — see docs/screening-spec.md and docs/scoring-spec.md.
+// The LLM extraction pass produces `EvidenceFacts`; the deterministic screening
+// engine produces `IntakeGate` + `ScreenResult[]` + `KillCheck`; the deterministic
+// scoring engine produces `Scorecard`. No score is ever LLM-generated.
+// ---------------------------------------------------------------------------
+
+/** Which legal pipeline a violation belongs to. */
+export type Track = "tcpa" | "debt_collection";
+
+export type MessageType =
+  | "marketing"
+  | "debt_collection"
+  | "informational"
+  | "unknown";
+export type ContactChannel = "text" | "call" | "voicemail" | "email" | "unknown";
+export type ContactDirection = "from_consumer" | "from_company" | "unknown";
+/** Auto-decline signals (scoring-spec §2). Device marketing is NOT true_healthcare. */
+export type KillSignal = "job_scam" | "true_healthcare" | "none";
+/** Consent posture for Defensibility (scoring-spec §3.6). */
+export type ConsentSignal =
+  | "cold_contact"
+  | "ambiguous"
+  | "prior_relationship"
+  | "unknown";
+
+/** One normalized message/contact extracted from a single piece of evidence. */
+export type ExtractedContact = {
+  /** Filename of the evidence this contact came from (matches CaseFile.name). */
+  file: string;
+  /**
+   * 1-based chronological position of this message in the overall conversation
+   * timeline (oldest → newest), shared across ALL files: the same message shown
+   * in two overlapping screenshots gets ONE sequence. Screening relies on this
+   * for message order (e.g. "STOP, then a later contact") so an untimestamped
+   * bubble can't scramble the timeline. See screening-spec §4.
+   */
+  sequence: number;
+  direction: ContactDirection;
+  channel: ContactChannel;
+  /**
+   * Timestamp shown in the evidence (ISO 8601), treated as the consumer's LOCAL
+   * time per screening-spec §4 (Quiet Hours). Null if none is visible.
+   */
+  timestamp: string | null;
+  /**
+   * True when `timestamp` was INFERRED from neighbouring messages (the message
+   * had no visible time of its own — e.g. a sent "Stop" bubble) rather than read
+   * directly. Screening must not trust an inferred timestamp for time-gap math;
+   * it falls back to `sequence` order instead.
+   */
+  timestampInferred: boolean;
+  /**
+   * Receipt date (ISO `YYYY-MM-DD`) for the SOL clock — set ONLY when a 4-digit
+   * year is explicitly visible in the evidence; null otherwise. We never store a
+   * guessed year (see `dateReceivedYearShown`).
+   */
+  dateReceived: string | null;
+  /**
+   * Whether a 4-digit year was actually visible for this date. Messaging/email
+   * apps show only month/day for recent (current-year) messages and add the year
+   * only for OLDER ones — so a date with no visible year is treated as
+   * current-year / in-window, and only an explicit-year date can be time-barred.
+   * See screening-spec §1.
+   */
+  dateReceivedYearShown: boolean;
+  messageType: MessageType;
+  /** The consumer asked to stop ("stop", "unsubscribe", "remove me", …). */
+  isStopRequest: boolean;
+  /** A single automated "you've been opted out" confirmation (carve-out, not a violation). */
+  isOptOutConfirmation: boolean;
+  /** Audio only: the voicemail is pre-recorded / artificial (corroborated by forensics). */
+  isPrerecorded: boolean;
+  consentSignal: ConsentSignal;
+  killSignal: KillSignal;
+  /** Short factual summary of the message content. */
+  contentSummary: string;
 };
+
+/** The normalized fact set for a whole intake, produced by the extraction pass. */
+export type EvidenceFacts = {
+  contacts: ExtractedContact[];
+  /** Free-form items the extractor flagged worth confirming at intake. */
+  notes?: string[];
+};
+
+export type IntakeDeclineReason = "time-barred" | "no-claim-informational";
+
+/** Intake-level gate outcome (screening-spec §1–2), computed before identification. */
+export type IntakeGate = {
+  /** At least one qualifying message is inside the viable SOL window. */
+  solPass: boolean;
+  /** SOP: an SOL problem means the lead must be told immediately. */
+  notifyLeadImmediately: boolean;
+  /** At least one in-window message shows a potential violation. */
+  hasPlausibleClaim: boolean;
+  /** True when the intake is rejected here (no identification runs). */
+  declined: boolean;
+  declineReason?: IntakeDeclineReason;
+  /** Flagged unknowns surfaced at the gate (e.g. unconfirmed message dates). */
+  unknowns?: string[];
+};
+
+export type ScreenId =
+  | "prerecorded_voice"
+  | "failure_to_stop"
+  | "quiet_hours"
+  | "dnc_registry";
+
+/** Result of one of the four screens for one company (screening-spec §4). */
+export type ScreenResult = {
+  screen: ScreenId;
+  hit: boolean;
+  /** Which track the hit belongs to; null when the screen did not hit. */
+  track: Track | null;
+  /** Human-readable basis citing the evidence. */
+  basis: string;
+  /** Applicable but unconfirmable (e.g. DNC needs the API). MVP: Screen 04. */
+  unverified?: boolean;
+};
+
+export type KillReason = "job_scam" | "true_healthcare";
+
+/** Auto-decline outcome for one company (scoring-spec §2). */
+export type KillCheck = {
+  declined: boolean;
+  reason?: KillReason;
+  basis?: string;
+};
+
+export type Band = "priority" | "solid" | "marginal" | "pass";
+
+/** One scored factor in the scorecard (scoring-spec §3). */
+export type ScoreFactor = {
+  name: string;
+  points: number;
+  max: number;
+  /** How the points were arrived at, citing the evidence/enrichment. */
+  basis: string;
+};
+
+/** The per-company TCPA IQ scorecard (scoring-spec §6). */
+export type Scorecard = {
+  factors: ScoreFactor[];
+  /** Additive sum of the six factors before any cap. */
+  raw: number;
+  /** True when the shell cap reduced the final score. */
+  capApplied: boolean;
+  final: number;
+  band: Band;
+  killCheck: KillCheck;
+  /** "Needs intake to confirm" items that could move the score. */
+  unknowns: string[];
+};
+
+/** Days of filing runway required before the 4-year SOL cutoff; under this → reject. */
+export const SOL_BUFFER_DAYS = 30;
+
+/**
+ * Optional willfulness bonus for high contact volume (scoring-spec §3.3).
+ * Default OFF — a deliberate, documented deviation from "highest single applies".
+ */
+export const HIGH_VOLUME_WILLFULNESS = {
+  enabled: false,
+  threshold: 10,
+  bonus: 6,
+} as const;
 
 export type RegisteredAgent = {
   name: string | null;
@@ -131,6 +290,13 @@ export type DefendantCandidate = {
   // claim the case's evidence as its proof — it came from the registry, not the
   // files. See candidateEvidence.
   synthesized?: boolean;
+  // --- Per-company screening + scoring (populated after identification) ---
+  /** Which pipeline this company falls into. Debt-collection companies are not TCPA-scored. */
+  track?: Track;
+  /** The four screens evaluated over this company's attributed evidence. */
+  screens?: ScreenResult[];
+  /** The TCPA IQ scorecard. Absent for debt-collection-track or declined companies. */
+  scorecard?: Scorecard;
 };
 
 export type DefendantReport = {
@@ -139,6 +305,8 @@ export type DefendantReport = {
   sos_records?: SosEntity[];
   unmatched_sos_records?: SosEntity[];
   sos_error?: string;
+  /** The agent's written investigation narrative (why it did/didn't find a company). */
+  investigation_summary?: string;
 };
 
 /** A case: the evidence sent in, plus everything derived from it. */
@@ -150,9 +318,14 @@ export type Case = {
   /** When processing reached a terminal state (ms epoch); freezes the clock. */
   completedAt?: number;
   files: CaseFile[];
-  evaluationStatus: EvaluationStatus;
-  evaluation?: Evaluation;
-  evaluationError?: string;
+  /** Normalized facts extracted from the evidence; input to screening + scoring. */
+  facts?: EvidenceFacts;
+  /** Intake-level gate outcome (SOL + plausible-claim). Set by the extraction step. */
+  gate?: IntakeGate;
+  /** Status of the extraction + intake-gate screening step. */
+  screeningStatus: ScreeningStatus;
+  /** Error from the screening step, if it failed. */
+  screeningError?: string;
   defendantStatus: DefendantStatus;
   /** Id of the background investigation job, set while it is running/polling. */
   defendantJobId?: string;
@@ -160,4 +333,8 @@ export type Case = {
   defendantError?: string;
   defendantSosError?: string;
   defendantUnmatchedSos?: SosEntity[];
+  /** The queries the agent investigated (numbers, brands, phrases). */
+  defendantSearchTerms?: string[];
+  /** The agent's written investigation narrative — shown when no company is identified. */
+  defendantInvestigation?: string;
 };

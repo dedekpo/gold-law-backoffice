@@ -140,8 +140,16 @@ from 0 to 1; the source URLs you relied on; and any notable next steps. Also sta
 file(s) this company was identified from, citing the EXACT filename shown in that file's
 "### File N — … — <filename>" header (a company may come from more than one file, and different
 companies may come from different files). State any of these you could not find as "not found" rather
-than guessing. Note in the report which state's registry confirmed the entity. If you genuinely cannot
-identify any company, say so plainly — do not invent one.
+than guessing. Note in the report which state's registry confirmed the entity.
+
+If you genuinely cannot identify any company, say so plainly — do not invent one — and this is
+REQUIRED: explain the "why not" so a reviewer doesn't have to redo your work. Spell out (1) every
+phone number and brand/company name you searched and the exact queries you ran; (2) what the web
+results showed — name the specific candidate websites you looked at and, for each, why you accepted
+or (more importantly) rejected it (e.g. "softwarefinder.com — a software-review directory, not the
+sender; business doesn't match a lead-gen SMS"); and (3) the concrete reason no legal entity could
+be confirmed (number unlisted, brand too generic, site business didn't match the messages, no
+matching Secretary of State record, etc.). Write this even when you find nothing.
 
 --- SOP (source of truth) ---
 `;

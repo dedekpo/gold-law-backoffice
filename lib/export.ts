@@ -1,17 +1,18 @@
 // Export helpers for the intake handoff. A "found company" (or a whole case) is
 // packaged into a single .zip the intakers can file: the raw audio/image
-// evidence, their transcriptions, the TCPA evaluation, the company enrichment,
-// and the authoritative Secretary of State record(s). Each zip carries both a
-// machine-readable `manifest.json` (shaped to map cleanly onto the coming
-// database record) and a human-readable `summary.txt`.
+// evidence, their transcriptions, the per-company TCPA IQ scorecard + four-screen
+// results, the company enrichment, and the authoritative Secretary of State
+// record(s). Each zip carries both a machine-readable `manifest.json` (shaped to
+// map cleanly onto the coming database record) and a human-readable `summary.txt`.
 
 import { strToU8, zipSync, type Zippable } from "fflate";
 import {
+  BAND_LABELS,
+  SCREEN_LABELS,
   SOLVABILITY_LABELS,
+  TRACK_LABELS,
   candidateEvidence,
-  categoryLabel,
   joinAddress,
-  messageTypeLabel,
   recordLabel,
 } from "./display";
 import type {
@@ -19,6 +20,8 @@ import type {
   Case,
   CaseFile,
   DefendantCandidate,
+  IntakeGate,
+  KillReason,
   SosEntity,
 } from "./types";
 
@@ -38,11 +41,12 @@ export type CompanyManifest = {
   generatedAt: string;
   case: { id: string; name: string };
   /**
-   * Case-wide TCPA evaluation. Present in a standalone single-company bundle;
-   * omitted in the case bundle's per-company folders, where it lives only in the
-   * root (it is identical across companies).
+   * Intake gate outcome (SOL + plausible-claim). Present in a standalone
+   * single-company bundle; omitted in the case bundle's per-company folders,
+   * where it lives only in the root (it is identical across companies). The
+   * per-company score lives on `company.scorecard`.
    */
-  evaluation?: Case["evaluation"] | null;
+  gate?: IntakeGate | null;
   company: DefendantCandidate;
   /**
    * Whether `evidence` is the file(s) attributed to this specific company
@@ -66,7 +70,7 @@ export type CaseCompanyEntry = {
 export type CaseManifest = {
   generatedAt: string;
   case: { id: string; name: string };
-  evaluation: Case["evaluation"] | null;
+  gate: IntakeGate | null;
   companies: CaseCompanyEntry[];
   unmatchedSosRecords: SosEntity[];
   /** Evidence not attributed to any identified company. */
@@ -147,7 +151,7 @@ function resolveEvidence(files: CaseFile[], folder: string): ResolvedEvidence[] 
 export function buildCompanyManifest(
   caseItem: Case,
   candidate: DefendantCandidate,
-  options?: { fallback?: boolean; includeEvaluation?: boolean },
+  options?: { fallback?: boolean; includeGate?: boolean },
 ): CompanyManifest {
   const { files, attributed } = candidateEvidence(caseItem.files, candidate, {
     ...options,
@@ -160,10 +164,10 @@ export function buildCompanyManifest(
     evidenceAttributed: attributed,
     evidence: resolveEvidence(files, "evidence").map((r) => r.entry),
   };
-  // The case-wide evaluation is included for a standalone company bundle, but
-  // omitted in the case bundle's per-company folders (it lives in the root).
-  if (options?.includeEvaluation ?? true) {
-    manifest.evaluation = caseItem.evaluation ?? null;
+  // The intake gate is included for a standalone company bundle, but omitted in
+  // the case bundle's per-company folders (it lives in the root).
+  if (options?.includeGate ?? true) {
+    manifest.gate = caseItem.gate ?? null;
   }
   return manifest;
 }
@@ -212,7 +216,7 @@ function planCase(caseItem: Case): {
     manifest: {
       generatedAt: new Date().toISOString(),
       case: { id: caseItem.id, name: caseItem.name },
-      evaluation: caseItem.evaluation ?? null,
+      gate: caseItem.gate ?? null,
       companies,
       unmatchedSosRecords: caseItem.defendantUnmatchedSos ?? [],
       unattributedEvidence: orphanResolved.map((r) => r.entry),
@@ -282,14 +286,67 @@ function sosRecordText(sos: SosEntity): string {
   return lines.join("\n");
 }
 
-function evaluationText(evaluation: Case["evaluation"] | null): string {
-  if (!evaluation) return "  (not evaluated)";
-  return [
-    dash("  Score", `${evaluation.score}/10`),
-    dash("  Category", categoryLabel(evaluation.category)),
-    dash("  Message type", messageTypeLabel(evaluation.message_type)),
-    `  Reasoning:\n    ${evaluation.reasoning.replace(/\n/g, "\n    ")}`,
-  ].join("\n");
+function gateText(gate: IntakeGate | null): string {
+  if (!gate) return "  (not screened)";
+  const lines = [
+    dash("  SOL (4-year clock)", gate.solPass ? "within window" : "TIME-BARRED"),
+    dash("  Plausible claim", gate.hasPlausibleClaim ? "yes" : "no"),
+    dash(
+      "  Outcome",
+      gate.declined ? `DECLINED (${gate.declineReason ?? "—"})` : "passed",
+    ),
+  ];
+  if (gate.notifyLeadImmediately) {
+    lines.push("  ⚠ NOTIFY THE LEAD IMMEDIATELY (statute-of-limitations problem).");
+  }
+  for (const u of gate.unknowns ?? []) lines.push(`  • ${u}`);
+  return lines.join("\n");
+}
+
+const KILL_REASON_LABELS: Record<KillReason, string> = {
+  job_scam: "Job / employment scam",
+  true_healthcare: "True healthcare services",
+};
+
+/** The per-company TCPA IQ scorecard + four-screen results (scoring-spec §6). */
+function scorecardText(candidate: DefendantCandidate): string {
+  if (candidate.track === "debt_collection" && !candidate.scorecard) {
+    return "  Track: Debt collection — routed to the FDCPA/Florida pipeline, not TCPA-scored.";
+  }
+  const sc = candidate.scorecard;
+  if (!sc) return "  (not scored)";
+
+  const lines: string[] = [];
+  if (sc.killCheck.declined) {
+    const reason = sc.killCheck.reason
+      ? KILL_REASON_LABELS[sc.killCheck.reason]
+      : "kill condition";
+    lines.push(`  DECLINE — ${reason}${sc.killCheck.basis ? ` (${sc.killCheck.basis})` : ""}. No score.`);
+    return lines.join("\n");
+  }
+
+  lines.push(dash("  SCORE", `${sc.final}/100 → ${BAND_LABELS[sc.band]}`));
+  if (sc.capApplied) {
+    lines.push(`  Shell cap applied — capped at 50 (raw score was ${sc.raw}).`);
+  }
+  lines.push("  Breakdown:");
+  for (const f of sc.factors) {
+    lines.push(`    ${f.name}: ${f.points}/${f.max} — ${f.basis}`);
+  }
+  const screens = candidate.screens ?? [];
+  if (screens.length) {
+    lines.push("  Four screens:");
+    for (const s of screens) {
+      const mark = s.hit ? "HIT" : s.unverified ? "UNVERIFIED" : "—";
+      const track = s.hit && s.track ? ` [${TRACK_LABELS[s.track]}]` : "";
+      lines.push(`    ${SCREEN_LABELS[s.screen]}: ${mark}${track} — ${s.basis}`);
+    }
+  }
+  if (sc.unknowns.length) {
+    lines.push("  Needs intake to confirm:");
+    for (const u of sc.unknowns) lines.push(`    • ${u}`);
+  }
+  return lines.join("\n");
 }
 
 function evidenceText(evidence: EvidenceEntry[]): string {
@@ -360,6 +417,9 @@ function companyBlock(candidate: DefendantCandidate): string {
     dash("  Employees", candidate.employees_estimate),
     dash("  Revenue", candidate.revenue_estimate),
     "",
+    "  TCPA IQ SCORECARD:",
+    scorecardText(candidate),
+    "",
     "  WHO TO SERVE (registered agent):",
     dash("    Name", agent?.name),
     dash("    Address", agent?.address),
@@ -392,10 +452,10 @@ export function companySummaryText(manifest: CompanyManifest): string {
     companyBlock(manifest.company),
     "",
   ];
-  // Only present in a standalone company bundle; in the case bundle the
-  // evaluation lives in the root summary.
-  if (manifest.evaluation !== undefined) {
-    lines.push("TCPA EVALUATION", evaluationText(manifest.evaluation), "");
+  // Only present in a standalone company bundle; in the case bundle the intake
+  // gate lives in the root summary.
+  if (manifest.gate !== undefined) {
+    lines.push("INTAKE GATE", gateText(manifest.gate), "");
   }
   lines.push(
     `EVIDENCE (${manifest.evidence.length})${
@@ -438,8 +498,8 @@ export function caseSummaryText(manifest: CaseManifest): string {
     `Generated: ${manifest.generatedAt}`,
     `Case: ${manifest.case.name} (${manifest.case.id})`,
     "",
-    "TCPA EVALUATION",
-    evaluationText(manifest.evaluation),
+    "INTAKE GATE",
+    gateText(manifest.gate),
     "",
     `IDENTIFIED COMPANIES (${manifest.companies.length})`,
     companies,
@@ -510,7 +570,7 @@ export async function buildCaseZip(caseItem: Case): Promise<Blob> {
   for (const entry of manifest.companies) {
     const sub = buildCompanyManifest(caseItem, entry.company, {
       fallback: false,
-      includeEvaluation: false, // case-wide evaluation lives in the root only
+      includeGate: false, // the intake gate lives in the root only
     });
     entries[`${entry.folder}/manifest.json`] = strToU8(
       JSON.stringify(sub, null, 2),

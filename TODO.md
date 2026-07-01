@@ -7,7 +7,13 @@ implemented yet — this is a planning document.
 
 ## 1. Always do a Florida cross-lookup when the company is registered elsewhere
 
-**Status:** Not implemented today.
+**Status:** Implemented. The identification route runs an additional Florida
+`sos_lookup` for every confirmed non-Florida entity, dedupes per (legal name,
+state) so the home and Florida foreign registrations are both kept, prefers the
+Florida registered agent for service, and skips a redundant lookup when the
+company is already a Florida entity (see `app/api/defendant-identification/route.ts`).
+
+Original note retained for history:
 
 Right now the `sos_lookup` agent only retries other states when the first state
 returns *no match*. Once it finds the company (e.g. in California), it stops — it

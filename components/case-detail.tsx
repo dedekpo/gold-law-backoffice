@@ -1,14 +1,14 @@
 import type { Case, CaseFile } from "@/lib/types";
 import { recordLabel } from "@/lib/display";
 import { buildCaseZip, caseZipFilename } from "@/lib/export";
-import { EvaluationPanel, ScoreBadge } from "./evaluation";
+import { CaseStatusBadge, GateBanner } from "./screening";
 import { ElapsedTimer } from "./elapsed-timer";
 import { DownloadButton } from "./download-button";
 import { FileThumbnail } from "./evidence";
 import { CompanyCard } from "./company-card";
 import { SosRecordPanel } from "./sos";
 
-/** The selected case in full: evaluation, evidence, and identified companies. */
+/** The selected case in full: intake gate, evidence, and scored companies. */
 export function CaseDetail({
   caseItem,
   onOpenFile,
@@ -36,7 +36,7 @@ export function CaseDetail({
           </p>
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1.5">
-          <ScoreBadge caseItem={caseItem} />
+          <CaseStatusBadge caseItem={caseItem} />
           <ElapsedTimer caseItem={caseItem} />
           {fileCount > 0 && (
             <DownloadButton
@@ -52,7 +52,7 @@ export function CaseDetail({
       </header>
 
       <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto p-6">
-        <EvaluationPanel caseItem={caseItem} />
+        <GateBanner caseItem={caseItem} />
 
         <section>
           <p className="mb-2 text-[10px] uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
@@ -117,25 +117,28 @@ function CompaniesSection({
       )}
 
       {companies.length > 0 ? (
-        <div className="flex flex-col gap-3">
-          {companies.map((candidate, i) => (
-            <CompanyCard
-              key={`${candidate.company_name}-${i}`}
-              caseItem={caseItem}
-              candidate={candidate}
-              onOpenFile={onOpenFile}
-            />
-          ))}
-        </div>
+        <>
+          <div className="flex flex-col gap-3">
+            {companies.map((candidate, i) => (
+              <CompanyCard
+                key={`${candidate.company_name}-${i}`}
+                caseItem={caseItem}
+                candidate={candidate}
+                onOpenFile={onOpenFile}
+              />
+            ))}
+          </div>
+          <InvestigationDetails caseItem={caseItem} />
+        </>
+      ) : caseItem.defendantStatus === "done" ? (
+        <NoCompanyPanel caseItem={caseItem} />
       ) : (
         <p className="text-sm text-zinc-500 dark:text-zinc-400">
           {caseItem.defendantStatus === "identifying"
             ? "The agent is searching the web and the Secretary of State registries…"
             : caseItem.defendantStatus === "error"
               ? "Identification could not be completed — see the error above."
-              : caseItem.evaluationStatus === "done"
-                ? "No companies identified for this case."
-                : "Waiting for evaluation…"}
+              : "Waiting for screening…"}
         </p>
       )}
 
@@ -156,5 +159,71 @@ function CompaniesSection({
         </div>
       )}
     </section>
+  );
+}
+
+/** Search terms + the agent's written narrative of what it found and rejected. */
+function InvestigationBody({ caseItem }: { caseItem: Case }) {
+  const summary = caseItem.defendantInvestigation?.trim();
+  const terms = caseItem.defendantSearchTerms ?? [];
+  return (
+    <div className="flex flex-col gap-3">
+      {terms.length > 0 && (
+        <div>
+          <p className="mb-1 text-[10px] uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+            Searched
+          </p>
+          <div className="flex flex-wrap gap-1">
+            {terms.map((t) => (
+              <span
+                key={t}
+                className="rounded bg-zinc-200 px-1.5 py-0.5 text-[11px] text-zinc-700 dark:bg-zinc-800 dark:text-zinc-200"
+              >
+                {t}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+      {summary ? (
+        <p className="whitespace-pre-wrap text-sm leading-6 text-zinc-700 dark:text-zinc-300">
+          {summary}
+        </p>
+      ) : (
+        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+          The agent did not record a written summary of its search.
+        </p>
+      )}
+    </div>
+  );
+}
+
+/** Shown when identification finished but produced no company — explains why. */
+function NoCompanyPanel({ caseItem }: { caseItem: Case }) {
+  return (
+    <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-900">
+      <p className="mb-2 text-sm font-semibold text-zinc-800 dark:text-zinc-200">
+        No company could be identified — here&apos;s what the agent tried
+      </p>
+      <InvestigationBody caseItem={caseItem} />
+    </div>
+  );
+}
+
+/** Collapsible investigation trail shown alongside identified companies. */
+function InvestigationDetails({ caseItem }: { caseItem: Case }) {
+  const hasContent =
+    Boolean(caseItem.defendantInvestigation?.trim()) ||
+    (caseItem.defendantSearchTerms?.length ?? 0) > 0;
+  if (!hasContent) return null;
+  return (
+    <details className="mt-4 rounded-lg border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-900">
+      <summary className="cursor-pointer text-[10px] uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+        Investigation notes
+      </summary>
+      <div className="mt-3">
+        <InvestigationBody caseItem={caseItem} />
+      </div>
+    </details>
   );
 }

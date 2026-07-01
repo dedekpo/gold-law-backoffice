@@ -1,8 +1,8 @@
 "use client";
 
 import type { ChangeEvent } from "react";
-import type { Case } from "@/lib/types";
-import { scoreTone } from "@/lib/display";
+import type { Band, Case } from "@/lib/types";
+import { bandTone, bestBand } from "@/lib/display";
 import { UploadIcon } from "./icons";
 
 export function CaseSidebar({
@@ -69,8 +69,11 @@ function CaseRow({
 }) {
   const fileCount = caseItem.files.length;
   const companyCount = caseItem.defendants?.length ?? 0;
-  const tone =
-    caseItem.evaluation != null ? scoreTone(caseItem.evaluation.score) : null;
+  const bands = (caseItem.defendants ?? [])
+    .map((c) => c.scorecard?.band)
+    .filter((b): b is Band => Boolean(b));
+  const topBand = bestBand(bands);
+  const tone = topBand ? bandTone(topBand) : null;
 
   return (
     <button
@@ -96,9 +99,9 @@ function CaseRow({
             ` · ${companyCount} compan${companyCount === 1 ? "y" : "ies"}`}
         </span>
       </span>
-      {caseItem.evaluation != null && (
-        <span className="shrink-0 text-xs font-semibold text-zinc-400 dark:text-zinc-500">
-          {caseItem.evaluation.score}
+      {tone && (
+        <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
+          {tone.label}
         </span>
       )}
     </button>

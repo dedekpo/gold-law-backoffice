@@ -57,9 +57,9 @@ export const MODELS = {
    * Legal reasoning and scoring (TCPA evaluation + audio forensics). Pro-tier
    * for the smartest, most consistent judgment; native vision for images.
    */
-  analysis: "gemini-3.1-pro-preview",
+  analysis: "gemini-2.5-pro",
   /** Image description & audio transcription — fast multimodal extraction. */
-  media: "gemini-3.5-flash",
+  media: "gemini-2.5-flash",
   /** Defendant agent: many tool-loop steps, so favour a fast model. */
-  agent: "gemini-3.5-flash",
+  agent: "gemini-2.5-flash",
 } as const;

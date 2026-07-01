@@ -15,6 +15,13 @@ import { joinAddress, recordLabel } from "@/lib/display";
 import { getJob, startJob } from "@/lib/jobs";
 import { type Logger, createLogger, nextRequestId } from "@/lib/logger";
 import { isRateLimitError } from "@/lib/rate-limit";
+import { assessCompany } from "@/lib/scoring/assess";
+import type {
+  ExtractedContact,
+  ScreenResult,
+  Scorecard,
+  Track,
+} from "@/lib/types";
 
 const baseLog = createLogger("defendant-id");
 
@@ -80,12 +87,30 @@ function sameRegistration(a: SosEntity, b: SosEntity): boolean {
 }
 
 /**
+ * A registry result is a GENUINE hit only when it was found AND the returned
+ * legal name actually matches what we searched. A name search returns the
+ * registry's closest entry, not necessarily an exact hit (e.g. searching
+ * "Software Finder LLC" in Florida returns Sunbiz's neighbouring "Software
+ * Finders, Inc."). This one predicate gates BOTH record attachment and the
+ * Florida-check outcome, so a fuzzy near-match can never become a confirmed
+ * entity nor silently award the Florida forum bonus.
+ */
+function isGenuineHit(
+  r: SosLookupResult,
+): r is Extract<SosLookupResult, { found: true }> {
+  return (
+    r.found &&
+    (!r.entity.entityName || namesMatch(r.queriedName, r.entity.entityName))
+  );
+}
+
+/**
  * Merge found entities into `into`, deduping per (legal name, state). On a
  * same-state collision keep the Active/Good-Standing record.
  */
 function collectEntities(into: SosEntity[], results: SosLookupResult[]): void {
   for (const r of results) {
-    if (!r.found) continue;
+    if (!isGenuineHit(r)) continue;
     const dupeIndex = into.findIndex((e) => sameRegistration(e, r.entity));
     if (dupeIndex === -1) into.push(r.entity);
     else if (isActive(r.entity) && !isActive(into[dupeIndex])) {
@@ -139,6 +164,10 @@ type CandidateWithSos = DefendantCandidate & {
   fl_check: FlCheckStatus;
   // Set on candidates built from a registry record alone (synthesizeCandidateFromSos).
   synthesized?: boolean;
+  // Per-company screening + scoring, attached after identification (Step 6).
+  track?: Track;
+  screens?: ScreenResult[];
+  scorecard?: Scorecard;
 };
 
 /**
@@ -315,21 +344,64 @@ type DefendantResponse = {
   sos_records: SosEntity[];
   unmatched_sos_records: SosEntity[];
   sos_error?: string;
+  // The agent's own written investigation narrative — surfaced so a case that
+  // identifies no company still shows what was searched and why nothing stuck.
+  investigation_summary?: string;
 };
 
 const fileSchema = z.object({
   kind: z.enum(["audio", "image"]),
   name: z.string(),
   text: z.string(),
+  // Audio forensic hint, merged into the extracted contacts so Screen 01
+  // (prerecorded voice) is grounded in the acoustic analysis.
+  forensics: z
+    .object({
+      is_likely_prerecorded: z.boolean(),
+      automated_likelihood: z.number(),
+    })
+    .optional(),
+});
+
+// Mirrors EvidenceFacts (lib/types) — the normalized facts from the extraction
+// pass, used to screen + score each identified company.
+const contactSchema = z.object({
+  file: z.string(),
+  // Chronological ordering + inferred-timestamp flag drive Screen 02 (failure to
+  // stop). Defaulted so older extraction payloads without them still validate;
+  // the route re-derives a stable order when `sequence` is absent.
+  sequence: z.number().optional(),
+  timestampInferred: z.boolean().optional(),
+  direction: z.enum(["from_consumer", "from_company", "unknown"]),
+  channel: z.enum(["text", "call", "voicemail", "email", "unknown"]),
+  timestamp: z.string().nullable(),
+  dateReceived: z.string().nullable(),
+  dateReceivedYearShown: z.boolean(),
+  messageType: z.enum([
+    "marketing",
+    "debt_collection",
+    "informational",
+    "unknown",
+  ]),
+  isStopRequest: z.boolean(),
+  isOptOutConfirmation: z.boolean(),
+  isPrerecorded: z.boolean(),
+  consentSignal: z.enum([
+    "cold_contact",
+    "ambiguous",
+    "prior_relationship",
+    "unknown",
+  ]),
+  killSignal: z.enum(["job_scam", "true_healthcare", "none"]),
+  contentSummary: z.string(),
 });
 
 const requestSchema = z.object({
   files: z.array(fileSchema).min(1),
-  evaluation: z
+  facts: z
     .object({
-      category: z.string(),
-      message_type: z.string(),
-      reasoning: z.string(),
+      contacts: z.array(contactSchema),
+      notes: z.array(z.string()).optional(),
     })
     .optional(),
 });
@@ -392,14 +464,14 @@ export async function GET(request: Request) {
 }
 
 async function runInvestigation(
-  { files, evaluation }: z.infer<typeof requestSchema>,
+  { files, facts }: z.infer<typeof requestSchema>,
   log: Logger,
 ): Promise<DefendantResponse> {
   log.info("request received", {
     files: files.length,
     kinds: files.map((f) => f.kind).join(","),
-    hasEvaluation: Boolean(evaluation),
-    evaluationCategory: evaluation?.category,
+    hasFacts: Boolean(facts),
+    contacts: facts?.contacts.length ?? 0,
   });
 
   const fileBlocks = files
@@ -410,13 +482,9 @@ async function runInvestigation(
     })
     .join("\n\n---\n\n");
 
-  const evaluationBlock = evaluation
-    ? `\n\nPRIOR TCPA EVALUATION (context): category=${evaluation.category}, message_type=${evaluation.message_type}.\nReasoning: ${evaluation.reasoning}`
-    : "";
-
   const prompt = `The case below contains ${files.length} file${
     files.length === 1 ? "" : "s"
-  }. Identify the company (or companies) behind the phone number(s) or company name(s) in this evidence, following the SOP.${evaluationBlock}\n\n${fileBlocks}`;
+  }. Identify the company (or companies) behind the phone number(s) or company name(s) in this evidence, following the SOP.\n\n${fileBlocks}`;
 
   try {
     const agent = await getDefendantAgent();
@@ -501,7 +569,10 @@ async function runInvestigation(
       if (r.state.toUpperCase() !== "FL") continue;
       const key = normalizeName(r.queriedName);
       if (!key) continue;
-      const outcome: FlOutcome = r.found
+      // Use the SAME genuine-hit rule as record attachment: a fuzzy near-match
+      // (found, but the returned legal name isn't ours) is "FL checked, nothing
+      // on file" — not a Florida hit — so it can't award the forum bonus.
+      const outcome: FlOutcome = isGenuineHit(r)
         ? "found"
         : "error" in r
           ? "error"
@@ -527,11 +598,19 @@ async function runInvestigation(
     // candidates don't both grab it.
     const usedEntities = new Set<SosEntity>();
     const candidatesWithSos: CandidateWithSos[] = candidates.map((candidate) => {
+      // Match official records by the brand (company_name) OR the legal entity
+      // name. SOS records carry the LEGAL name, which often differs from the
+      // brand (e.g. "Orlando Harley-Davidson South" → "American Road Group LLC").
+      // Matching the brand alone orphans the record and splits one company into a
+      // duplicate "synthesized" card.
+      const candidateNames = [candidate.company_name, candidate.legal_name].filter(
+        (n): n is string => Boolean(n),
+      );
       const matches = foundEntities.filter(
         (e) =>
           !usedEntities.has(e) &&
           !!e.entityName &&
-          namesMatch(candidate.company_name, e.entityName),
+          candidateNames.some((n) => namesMatch(n, e.entityName!)),
       );
       matches.forEach((e) => usedEntities.add(e));
       const orderedRecords = orderRecords(matches);
@@ -607,6 +686,46 @@ async function runInvestigation(
     );
     const allCandidates = [...candidatesWithSos, ...synthesizedCandidates];
 
+    // Per-company screening + scoring. Merge the audio forensics hint into the
+    // extracted contacts (so Screen 01 is grounded in the acoustic analysis),
+    // then assess each company against ONLY its attributed evidence.
+    const rawContacts = facts?.contacts ?? [];
+    const prerecordedFiles = new Set(
+      files.filter((f) => f.forensics?.is_likely_prerecorded).map((f) => f.name),
+    );
+    // Normalize and put contacts in one chronological order (by `sequence`, with
+    // extraction order as a stable fallback) so per-company screens see the thread
+    // timeline — Screen 02 depends on "STOP then a later contact" being ordered.
+    const mergedContacts: ExtractedContact[] = rawContacts
+      .map((c, i) => ({
+        ...c,
+        sequence: c.sequence ?? i,
+        timestampInferred: c.timestampInferred ?? c.timestamp === null,
+        isPrerecorded: prerecordedFiles.has(c.file) ? true : c.isPrerecorded,
+      }))
+      .sort((a, b) => a.sequence - b.sequence);
+    const scoredCandidates: CandidateWithSos[] = allCandidates.map(
+      (candidate) => {
+        const companyContacts = mergedContacts.filter((c) =>
+          candidate.evidence_files.includes(c.file),
+        );
+        const assessment = assessCompany(candidate, companyContacts);
+        return {
+          ...candidate,
+          track: assessment.track,
+          screens: assessment.screens,
+          scorecard: assessment.scorecard,
+        };
+      },
+    );
+
+    log.info("companies scored", {
+      companies: scoredCandidates.length,
+      bands: scoredCandidates
+        .map((c) => c.scorecard?.band ?? c.track)
+        .join(" | "),
+    });
+
     log.info("sos lookups summarized", {
       attempts: sosResults.length,
       flCrossLookups: flResults.length,
@@ -617,7 +736,7 @@ async function runInvestigation(
     });
 
     return {
-      candidates: allCandidates,
+      candidates: scoredCandidates,
       search_terms_used: report.search_terms_used ?? [],
       sos_records: foundEntities,
       // Every confirmed entity is now a candidate, so nothing is left orphaned.
@@ -628,6 +747,7 @@ async function runInvestigation(
         foundEntities.length === 0 && sosErrors.length > 0
           ? sosErrors[0]
           : undefined,
+      investigation_summary: result.text?.trim() || undefined,
     };
   } catch (err) {
     // The POST has already returned; the job store records this failure and the

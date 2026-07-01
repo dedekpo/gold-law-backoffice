@@ -14,8 +14,9 @@ import type {
   Case,
   CaseFile,
   DefendantReport,
-  Evaluation,
+  EvidenceFacts,
   FileKind,
+  IntakeGate,
 } from "@/lib/types";
 import { CaseSidebar } from "@/components/case-sidebar";
 import { CaseDetail } from "@/components/case-detail";
@@ -129,7 +130,7 @@ export default function Home() {
   const [openFile, setOpenFile] = useState<CaseFile | null>(null);
 
   const casesRef = useRef<Case[]>([]);
-  const evaluatedRef = useRef<Set<string>>(new Set());
+  const extractedRef = useRef<Set<string>>(new Set());
   const identifiedRef = useRef<Set<string>>(new Set());
   const forensicsRef = useRef<Set<string>>(new Set());
 
@@ -145,7 +146,10 @@ export default function Home() {
     };
   }, []);
 
-  const evaluateCase = useCallback(async (caseId: string) => {
+  // Extract normalized facts from the evidence, then run the intake gate (SOL +
+  // plausible-claim). Replaces the old per-batch 0–10 evaluation. A declined
+  // intake is terminal and never reaches defendant identification.
+  const extractCase = useCallback(async (caseId: string) => {
     const c = casesRef.current.find((entry) => entry.id === caseId);
     if (!c) return;
     const successful = c.files.filter(
@@ -157,8 +161,8 @@ export default function Home() {
           entry.id === caseId
             ? {
                 ...entry,
-                evaluationStatus: "error",
-                evaluationError: "No files could be processed.",
+                screeningStatus: "error",
+                screeningError: "No files could be processed.",
                 completedAt: Date.now(),
               }
             : entry,
@@ -169,25 +173,39 @@ export default function Home() {
 
     setCases((prev) =>
       prev.map((entry) =>
-        entry.id === caseId ? { ...entry, evaluationStatus: "evaluating" } : entry,
+        entry.id === caseId ? { ...entry, screeningStatus: "evaluating" } : entry,
       ),
     );
 
     try {
-      // For image files, attach the original bytes so the evaluator reads the
-      // screenshot directly (native vision); audio stays as transcription text.
+      // Images: attach the original bytes for native vision. Audio: pass the
+      // forensic hint when it's already in, so isPrerecorded is grounded.
       const filesPayload = await Promise.all(
         successful.map(async (file) => {
-          const base = { kind: file.kind, name: file.name, text: file.text! };
+          const base: {
+            kind: FileKind;
+            name: string;
+            text: string;
+            image?: { data: string; mediaType: string };
+            forensics?: {
+              is_likely_prerecorded: boolean;
+              automated_likelihood: number;
+            };
+          } = { kind: file.kind, name: file.name, text: file.text! };
           if (file.kind === "image") {
             const image = await dataFromUrl(file.url, "image/png");
-            if (image) return { ...base, image };
+            if (image) base.image = image;
+          } else if (file.forensics) {
+            base.forensics = {
+              is_likely_prerecorded: file.forensics.is_likely_prerecorded,
+              automated_likelihood: file.forensics.automated_likelihood,
+            };
           }
           return base;
         }),
       );
 
-      const response = await fetch("/api/tcpa-evaluation", {
+      const response = await fetch("/api/extract-screen", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ files: filesPayload }),
@@ -196,25 +214,35 @@ export default function Home() {
         const body = (await response.json().catch(() => null)) as
           | { error?: string }
           | null;
-        throw new Error(body?.error ?? `Evaluation failed: ${response.status}`);
+        throw new Error(body?.error ?? `Screening failed: ${response.status}`);
       }
-      const evaluation = (await response.json()) as Evaluation;
-      setCases((prev) =>
-        prev.map((entry) =>
-          entry.id === caseId
-            ? { ...entry, evaluationStatus: "done", evaluation }
-            : entry,
-        ),
-      );
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Evaluation failed";
+      const { facts, gate } = (await response.json()) as {
+        facts: EvidenceFacts;
+        gate: IntakeGate;
+      };
       setCases((prev) =>
         prev.map((entry) =>
           entry.id === caseId
             ? {
                 ...entry,
-                evaluationStatus: "error",
-                evaluationError: message,
+                screeningStatus: "done",
+                facts,
+                gate,
+                // Declined at the gate → terminal; no identification will run.
+                completedAt: gate.declined ? Date.now() : entry.completedAt,
+              }
+            : entry,
+        ),
+      );
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Screening failed";
+      setCases((prev) =>
+        prev.map((entry) =>
+          entry.id === caseId
+            ? {
+                ...entry,
+                screeningStatus: "error",
+                screeningError: message,
                 completedAt: Date.now(),
               }
             : entry,
@@ -223,17 +251,17 @@ export default function Home() {
     }
   }, []);
 
-  // Trigger evaluation once a case has no in-flight files.
+  // Trigger extraction + gate once a case has no in-flight files.
   useEffect(() => {
     cases.forEach((c) => {
-      if (evaluatedRef.current.has(c.id)) return;
+      if (extractedRef.current.has(c.id)) return;
       if (c.files.length === 0) return;
       const stillProcessing = c.files.some((file) => file.status === "processing");
       if (stillProcessing) return;
-      evaluatedRef.current.add(c.id);
-      evaluateCase(c.id);
+      extractedRef.current.add(c.id);
+      extractCase(c.id);
     });
-  }, [cases, evaluateCase]);
+  }, [cases, extractCase]);
 
   const identifyDefendant = useCallback(async (caseId: string) => {
     const c = casesRef.current.find((entry) => entry.id === caseId);
@@ -260,14 +288,16 @@ export default function Home() {
             kind: file.kind,
             name: file.name,
             text: file.text!,
+            forensics: file.forensics
+              ? {
+                  is_likely_prerecorded: file.forensics.is_likely_prerecorded,
+                  automated_likelihood: file.forensics.automated_likelihood,
+                }
+              : undefined,
           })),
-          evaluation: c.evaluation
-            ? {
-                category: c.evaluation.category,
-                message_type: c.evaluation.message_type,
-                reasoning: c.evaluation.reasoning,
-              }
-            : undefined,
+          // Normalized facts from the extraction pass, used to screen + score
+          // each identified company.
+          facts: c.facts,
         }),
       });
       if (!startRes.ok) {
@@ -342,6 +372,8 @@ export default function Home() {
                 defendants: finalReport.candidates,
                 defendantSosError: finalReport.sos_error,
                 defendantUnmatchedSos: finalReport.unmatched_sos_records,
+                defendantSearchTerms: finalReport.search_terms_used,
+                defendantInvestigation: finalReport.investigation_summary,
                 completedAt: Date.now(),
               }
             : entry,
@@ -365,11 +397,13 @@ export default function Home() {
     }
   }, []);
 
-  // Once a case has been evaluated, kick off defendant identification.
+  // Once a case has passed the intake gate, kick off defendant identification.
+  // A declined intake (time-barred or no plausible claim) never reaches here.
   useEffect(() => {
     cases.forEach((c) => {
       if (identifiedRef.current.has(c.id)) return;
-      if (c.evaluationStatus !== "done") return;
+      if (c.screeningStatus !== "done") return;
+      if (!c.gate || c.gate.declined) return;
       identifiedRef.current.add(c.id);
       identifyDefendant(c.id);
     });
@@ -525,7 +559,7 @@ export default function Home() {
       name: formatCaseName(new Date()),
       createdAt: Date.now(),
       files: built.map((b) => b.file),
-      evaluationStatus: "idle",
+      screeningStatus: "idle",
       defendantStatus: "idle",
     };
     setCases((prev) => [...prev, newCase]);

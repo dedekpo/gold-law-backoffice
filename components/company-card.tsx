@@ -1,9 +1,19 @@
 "use client";
 
 import { Fragment, useState } from "react";
-import type { Case, CaseFile, DefendantCandidate } from "@/lib/types";
+import type {
+  Case,
+  CaseFile,
+  DefendantCandidate,
+  KillReason,
+  ScreenResult,
+} from "@/lib/types";
 import {
+  FACTOR_TOOLTIPS,
+  SCREEN_LABELS,
   SOLVABILITY_LABELS,
+  TRACK_LABELS,
+  bandTone,
   candidateEvidence,
   preferredServiceRecord,
   recordLabel,
@@ -64,8 +74,9 @@ export function CompanyCard({
         >
           <ChevronIcon open={open} />
           <span className="flex flex-col gap-1">
-            <span className="flex items-center gap-2 text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+            <span className="flex flex-wrap items-center gap-2 text-sm font-semibold text-zinc-900 dark:text-zinc-100">
               {c.company_name}
+              <ScoreBandChip candidate={c} />
               {records.length > 0 && (
                 <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200">
                   SOS verified
@@ -91,7 +102,10 @@ export function CompanyCard({
 
       {open && (
         <div className="border-t border-zinc-200 bg-zinc-50 px-4 py-4 dark:border-zinc-800 dark:bg-zinc-900">
-          <dl className="grid grid-cols-[10rem_1fr] gap-x-4 gap-y-2 text-sm">
+          <ScorecardPanel candidate={c} />
+          <ScreensPanel screens={c.screens ?? []} />
+
+          <dl className="mt-4 grid grid-cols-[10rem_1fr] gap-x-4 gap-y-2 text-sm">
             {rows.map(([label, value]) => (
               <Fragment key={label}>
                 <dt className="text-zinc-500 dark:text-zinc-400">{label}</dt>
@@ -184,6 +198,201 @@ export function CompanyCard({
         </div>
       )}
     </article>
+  );
+}
+
+const KILL_REASON_LABELS: Record<KillReason, string> = {
+  job_scam: "Job / employment scam",
+  true_healthcare: "True healthcare services",
+};
+
+/** Small score/band chip shown beside the company name. */
+function ScoreBandChip({ candidate }: { candidate: DefendantCandidate }) {
+  if (candidate.track === "debt_collection" && !candidate.scorecard) {
+    return (
+      <span className="rounded-full bg-purple-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-purple-800 dark:bg-purple-950 dark:text-purple-200">
+        Debt collection
+      </span>
+    );
+  }
+  const sc = candidate.scorecard;
+  if (!sc) return null;
+  if (sc.killCheck.declined) {
+    return (
+      <span className="rounded-full bg-red-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-red-800 dark:bg-red-950 dark:text-red-200">
+        Declined
+      </span>
+    );
+  }
+  const tone = bandTone(sc.band);
+  return (
+    <span
+      className={`rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide ${tone.chip}`}
+    >
+      {sc.final}/100 · {tone.label}
+    </span>
+  );
+}
+
+/** An info icon that reveals an explanatory tooltip on hover/focus. */
+function InfoTooltip({ text }: { text: string }) {
+  return (
+    <span className="group relative ml-1 inline-flex align-middle">
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={1.7}
+        aria-hidden
+        tabIndex={0}
+        className="h-3.5 w-3.5 cursor-help text-zinc-400 outline-none dark:text-zinc-500"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M11.25 11.25h.75v3.75h.75M12 8.25h.008M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"
+        />
+      </svg>
+      <span
+        role="tooltip"
+        className="pointer-events-none absolute left-0 top-full z-30 mt-1.5 w-60 rounded-md bg-zinc-900 px-2.5 py-1.5 text-[11px] font-normal leading-snug text-zinc-50 opacity-0 shadow-lg transition-opacity duration-100 group-hover:opacity-100 group-focus-within:opacity-100 dark:bg-zinc-700 dark:text-zinc-100"
+      >
+        {text}
+      </span>
+    </span>
+  );
+}
+
+/** Full TCPA IQ scorecard for the company (scoring-spec §6). */
+function ScorecardPanel({ candidate }: { candidate: DefendantCandidate }) {
+  if (candidate.track === "debt_collection" && !candidate.scorecard) {
+    return (
+      <div className="rounded-lg border border-purple-200 bg-purple-50 p-3 dark:border-purple-900 dark:bg-purple-950">
+        <p className="text-sm font-semibold text-purple-800 dark:text-purple-200">
+          Debt collection — separate track
+        </p>
+        <p className="mt-1 text-xs text-purple-700 dark:text-purple-300">
+          A STOP request was followed by another debt-collection text. Routed to
+          the FDCPA / Florida pipeline — not scored by the TCPA IQ engine.
+        </p>
+      </div>
+    );
+  }
+  const sc = candidate.scorecard;
+  if (!sc) return null;
+
+  if (sc.killCheck.declined) {
+    return (
+      <div className="rounded-lg border border-red-200 bg-red-50 p-3 dark:border-red-900 dark:bg-red-950">
+        <p className="text-sm font-semibold text-red-800 dark:text-red-200">
+          DECLINE — auto-kill condition
+        </p>
+        <p className="mt-1 text-xs text-red-700 dark:text-red-300">
+          {(sc.killCheck.reason
+            ? KILL_REASON_LABELS[sc.killCheck.reason]
+            : "Kill condition") +
+            (sc.killCheck.basis ? ` — ${sc.killCheck.basis}` : "")}
+          . No score produced.
+        </p>
+      </div>
+    );
+  }
+
+  const tone = bandTone(sc.band);
+  return (
+    <div className="rounded-lg border border-zinc-200 bg-white p-3 dark:border-zinc-800 dark:bg-zinc-950">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-[10px] uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+          TCPA IQ score
+        </span>
+        <span
+          className={`flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-semibold ${tone.chip}`}
+        >
+          <span className="text-sm font-bold leading-none">{sc.final}</span>
+          <span className="opacity-70">/ 100</span>
+          <span className="uppercase tracking-wide">{tone.label}</span>
+        </span>
+      </div>
+
+      {sc.capApplied && (
+        <p className="mt-2 rounded-md bg-amber-50 px-2 py-1 text-[11px] text-amber-800 dark:bg-amber-950 dark:text-amber-200">
+          Shell cap applied — capped at 50 (raw score was {sc.raw}).
+        </p>
+      )}
+
+      <dl className="mt-3 flex flex-col gap-1.5 text-sm">
+        {sc.factors.map((f) => (
+          <div
+            key={f.name}
+            className="grid grid-cols-[8.5rem_2.75rem_1fr] items-baseline gap-2"
+          >
+            <dt className="text-zinc-500 dark:text-zinc-400">
+              {f.name}
+              {FACTOR_TOOLTIPS[f.name] && (
+                <InfoTooltip text={FACTOR_TOOLTIPS[f.name]} />
+              )}
+            </dt>
+            <dd className="font-semibold tabular-nums text-zinc-900 dark:text-zinc-100">
+              {f.points}/{f.max}
+            </dd>
+            <dd className="text-xs text-zinc-500 dark:text-zinc-400">
+              {f.basis}
+            </dd>
+          </div>
+        ))}
+      </dl>
+
+      {sc.unknowns.length > 0 && (
+        <div className="mt-3 border-t border-zinc-200 pt-2 dark:border-zinc-800">
+          <p className="text-[10px] uppercase tracking-wide text-amber-600 dark:text-amber-400">
+            ⚠ Needs intake to confirm (could move the score)
+          </p>
+          <ul className="mt-1 flex flex-col gap-1">
+            {sc.unknowns.map((u) => (
+              <li key={u} className="text-xs text-zinc-600 dark:text-zinc-400">
+                • {u}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** The four screens for this company (screening-spec §4). */
+function ScreensPanel({ screens }: { screens: ScreenResult[] }) {
+  if (screens.length === 0) return null;
+  return (
+    <div className="mt-3">
+      <p className="mb-1.5 text-[10px] uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+        Four screens
+      </p>
+      <ul className="flex flex-col gap-1">
+        {screens.map((s) => {
+          const mark = s.hit ? "✓" : s.unverified ? "?" : "✕";
+          const markClass = s.hit
+            ? "text-emerald-600 dark:text-emerald-400"
+            : s.unverified
+              ? "text-amber-600 dark:text-amber-400"
+              : "text-zinc-400 dark:text-zinc-600";
+          return (
+            <li key={s.screen} className="flex flex-wrap items-baseline gap-2 text-xs">
+              <span className={`font-bold ${markClass}`}>{mark}</span>
+              <span className="font-medium text-zinc-700 dark:text-zinc-300">
+                {SCREEN_LABELS[s.screen]}
+              </span>
+              {s.hit && s.track && (
+                <span className="rounded bg-zinc-200 px-1 py-0.5 text-[9px] font-semibold uppercase text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
+                  {TRACK_LABELS[s.track]}
+                </span>
+              )}
+              <span className="text-zinc-500 dark:text-zinc-400">{s.basis}</span>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
   );
 }
 
