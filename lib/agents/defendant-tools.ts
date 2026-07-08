@@ -1,7 +1,7 @@
 import { generateText, tool } from "ai";
 import { z } from "zod";
 import { createLogger } from "@/lib/logger";
-import { MODELS, google } from "@/lib/provider";
+import { MODELS, anthropic } from "@/lib/provider";
 import { isRateLimitError } from "@/lib/rate-limit";
 import { rateLimitedModel } from "./model";
 
@@ -47,11 +47,10 @@ function htmlToText(html: string): string {
 }
 
 /**
- * Web search backed by a Gemini model with Google Search grounding. Returns a
- * synthesized answer plus the source URLs it cited, so the agent can follow up
- * with `fetch_page` on the most promising links. We stay on the same Gemini
- * family as the rest of the app so web search is covered by the same gateway
- * tier (perplexity/openai search models are premium-only).
+ * Web search backed by a Claude model with Anthropic's server-side web search
+ * tool. Returns a synthesized answer plus the source URLs it cited, so the
+ * agent can follow up with `fetch_page` on the most promising links. Same
+ * provider/model family as the rest of the investigation (see MODELS.agent).
  */
 export const webSearchTool = tool({
   description:
@@ -69,11 +68,16 @@ export const webSearchTool = tool({
       const { text, sources } = await generateText({
         model: rateLimitedModel(MODELS.agent),
         maxRetries: 0,
-        temperature: 0,
+        // Claude answers well-known queries from memory unless told otherwise;
+        // this tool's contract is a live search with citable URLs, so force it.
+        system:
+          "You are a web-search backend. ALWAYS run the web_search tool on the " +
+          "user's query — never answer from memory alone. Synthesize what the " +
+          "results say into a concise answer grounded in the cited sources.",
         prompt: query,
-        // Search grounding is a provider-defined tool in @ai-sdk/google (the old
-        // `providerOptions.useSearchGrounding` flag is gone).
-        tools: { google_search: google.tools.googleSearch({}) },
+        // Anthropic's server-side web search: the API runs the searches and
+        // returns cited results; the AI SDK surfaces citations as `sources`.
+        tools: { web_search: anthropic.tools.webSearch_20260209({}) },
       });
       const urls = sourceUrls(sources);
       done({ answerChars: text.length, sources: urls.length });

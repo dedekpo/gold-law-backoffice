@@ -243,8 +243,6 @@ export async function POST(request: Request) {
       generateText({
         model: model(MODELS.analysis),
         maxRetries: 0,
-        temperature: 0,
-        seed: 7,
         output: Output.object({ schema: factsSchema }),
         system:
           "You are an intake analyst for a consumer-protection law firm. From the " +

@@ -85,7 +85,7 @@ export async function POST(request: Request) {
     const done = log.start("model.forensics");
     const { output } = await runRateLimited(() =>
       generateText({
-        model: model(MODELS.analysis),
+        model: model(MODELS.audioForensics),
         maxRetries: 0,
         // Reproducible assessment: the same recording should yield the same
         // analysis when it is filed and later re-checked.

@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^3.0.95",
     "@ai-sdk/google": "^3.0.83",
     "@ai-sdk/google-vertex": "^4.0.153",
     "@audio/decode-amr": "^1.1.1",
@@ -29,9 +30,9 @@
     "tailwindcss": "^4",
     "typescript": "^5"
   },
-  "comment:overrides": "Force a single copy of the AI SDK core so the Vertex provider's tools (e.g. googleSearch grounding) share one Schema brand with `ai` — without this, ai@6 pins provider@3.0.10 while the providers pull 3.0.12, causing tool-type clashes.",
+  "comment:overrides": "Force a single copy of the AI SDK core so provider-defined tools (Anthropic web search, Vertex googleSearch grounding) share one Schema brand with `ai` — without this, ai@6 pins provider@3.0.10 while the providers pull newer patch versions, causing tool-type clashes. Keep these pinned to what the installed providers depend on (currently @ai-sdk/anthropic@3.0.95).",
   "overrides": {
-    "@ai-sdk/provider": "3.0.12",
-    "@ai-sdk/provider-utils": "4.0.33"
+    "@ai-sdk/provider": "3.0.13",
+    "@ai-sdk/provider-utils": "4.0.37"
   }
 }

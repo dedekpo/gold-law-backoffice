@@ -1,7 +1,7 @@
 # TODO
 
-Backlog for the defendant-identification / company-research flow. Nothing here is
-implemented yet — this is a planning document.
+Backlog for the defendant-identification / company-research flow. This is a
+planning document — each item carries its own **Status** line.
 
 ---
 
@@ -118,3 +118,161 @@ download: structured in `manifest.json`, appended in full under each recording i
 next to the audio. Per-company docs in the case bundle are scoped to that
 company's evidence; the case-wide TCPA evaluation lives only in the root (kept in
 a standalone single-company download, which has no root).
+
+---
+
+## 5. Prior-defendant check against the GHL "Defendants" custom object
+
+**Status:** Not started. The GHL API access is validated (branch `ghl-integration`);
+the temporary test page at `/ghl-test` proves the fetch works end-to-end.
+
+The firm keeps every company it has already sued in a GoHighLevel **custom object**
+called Defendants. When the agent identifies a company, it should check that list
+and **flag the company card** when it's a prior defendant.
+
+**What we want:** after the agent confirms a company (post SOS-lookup, when we have
+the legal name), search the Defendants object and, on a match, set a flag on the
+candidate (e.g. `prior_defendant: true` + the matched record) rendered as a clear
+badge on the company card — "we already sued this company, don't file again."
+
+**Why it matters:** we don't want to sue the same company twice. Today that check
+is manual memory; this makes it automatic on every investigation.
+
+**How to fetch** (the `/ghl-test` page + `app/api/ghl-test/route.ts` proxy are
+temporary and will be removed — these examples are the durable reference):
+
+Env: `GO_HIGH_LEVEL_TOKEN` (Private Integration token) and
+`GO_HIGH_LEVEL_LOCATION_ID`, both already in `.env`.
+
+```bash
+# Search Defendants records by (fuzzy) name — POST, note the JSON body
+curl -X POST "https://services.leadconnectorhq.com/objects/custom_objects.defendants/records/search" \
+  -H "Authorization: Bearer $GO_HIGH_LEVEL_TOKEN" \
+  -H "Version: 2021-07-28" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "locationId": "'$GO_HIGH_LEVEL_LOCATION_ID'",
+    "page": 1,
+    "pageLimit": 20,
+    "query": "Sunshine Marketing"
+  }'
+```
+
+```ts
+// Same call from server-side TypeScript
+const res = await fetch(
+  "https://services.leadconnectorhq.com/objects/custom_objects.defendants/records/search",
+  {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${process.env.GO_HIGH_LEVEL_TOKEN}`,
+      Version: "2021-07-28",
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify({
+      locationId: process.env.GO_HIGH_LEVEL_LOCATION_ID,
+      page: 1,
+      pageLimit: 20,
+      query: legalName, // free-text over the object's searchable properties
+    }),
+  },
+);
+```
+
+Related endpoints (all `GET`, same auth headers, no body):
+- `/objects/?locationId={locationId}` — list object schemas (source of truth for
+  the `custom_objects.defendants` key and its `searchableProperties`)
+- `/objects/custom_objects.defendants/records/{id}` — one record
+
+**Gotchas to handle:**
+- `query` is free-text over the object's **searchable properties** — make sure the
+  defendant-name field is marked searchable in the GHL schema, or name queries
+  return nothing.
+- Company names never match byte-for-byte ("Sunshine Marketing, LLC" vs "Sunshine
+  Marketing Inc"). Query with the confirmed legal name, then judge the returned
+  candidates with the same suffix-stripping normalizer the identification route
+  already uses (`normalizeName` / `namesMatch` in
+  `app/api/defendant-identification/route.ts`).
+- The Private Integration needs the **Objects — Read** scopes
+  (`objects/schema.readonly`, `objects/record.readonly`).
+- Check should run per confirmed candidate (including synthesized-from-SOS ones),
+  and a lookup failure must not sink the investigation — flag as "check failed",
+  don't block.
+
+---
+
+## 6. DNC (Do-Not-Call) registry lookup as agent enrichment
+
+**Status:** Not started — implementation (and API provider) yet to be decided.
+
+**What we want:** during enrichment, check the consumer's phone number against the
+National Do-Not-Call registry and surface the result on the case/company.
+
+**Why it matters:** calls/texts to a number on the DNC registry are a separate
+TCPA violation track (47 CFR § 64.1200(c)) — a registered number materially
+strengthens the case and should feed the screens/scorecard, not just be a note.
+
+**Open questions:**
+- Which API? The official registry (telemarketer side) vs third-party lookup
+  services (e.g. reputation/compliance APIs) — pricing, terms, and whether
+  registration *date* is available (we need "was it registered at the time of the
+  call", not just "is it registered today").
+- Where it hooks in: alongside the SOS/enrichment pass in defendant
+  identification, or earlier at extraction time when the consumer's number is
+  first known.
+- The consumer's own number must be reliably extractable from the evidence first
+  (it usually appears in screenshots/voicemail metadata; today extraction focuses
+  on the *sender*).
+
+---
+
+## 7. Webhook-driven investigations from the GHL pipeline (cards in/out)
+
+**Status:** Not started. Design below is validated against the API on the
+`ghl-integration` branch, but nothing is implemented.
+
+**What we want:** when a card (opportunity) is moved into the **"Ready for AI
+investigation"** column in GHL, a webhook triggers the agent automatically. When
+the investigation finishes:
+- create **N new cards** — one per company found — carrying the investigation
+  result, and
+- **delete or move** the original card (decide which; move-to-an-"Investigated"
+  stage is safer/auditable than delete),
+- place the new cards in the correct column for the outcome (e.g. by score band).
+
+**Why it matters:** removes the manual upload flow entirely — intake drops a card
+in a column, investigated companies come out as cards, one card per defendant.
+
+**Building blocks (already validated):**
+- **Trigger:** Private Integrations can't subscribe to app webhook events
+  (`OpportunityStageUpdate` needs a Marketplace App). Use a GHL **Workflow**
+  instead: trigger "Pipeline Stage Changed" filtered to the "Ready for AI
+  investigation" stage → **Custom Webhook** action POSTing the opportunity id to
+  our endpoint (e.g. `/api/ghl-intake`).
+- **Fetch the evidence:** `GET /opportunities/{id}` → `customFields` file arrays
+  hold the uploaded screenshots/audio. The `msgsndr-private.storage.googleapis.com`
+  URLs download with a plain unauthenticated GET (verified). Route each file by
+  `meta.mimetype` (`image/*` / `audio/*`).
+- **Run the existing pipeline server-side:** description/transcription →
+  extract-screen → defendant-identification (the long-running job pattern the
+  route already uses fits a webhook: ack fast, work in background). AMR audio
+  decode currently happens client-side (`lib/audio.ts`) and needs a server port.
+- **Create result cards:** `POST /opportunities/` with `locationId`, `pipelineId`,
+  `pipelineStageId` (target column), `contactId` (from the original card), name =
+  company, monetaryValue, and custom fields for score/flags. Stage ids come from
+  `GET /opportunities/pipelines?locationId=…`.
+- **Move/close the original:** `PUT /opportunities/{id}` with the new
+  `pipelineStageId` (or `DELETE /opportunities/{id}` if we really want deletion).
+
+**Gotchas to handle:**
+- **Idempotency:** workflows can re-fire (card dragged out and back in, workflow
+  re-published). Key runs on opportunity id + stage-entry timestamp so we never
+  double-investigate or double-create cards.
+- **Zero companies found:** decide the outcome column (e.g. "Needs manual
+  review") instead of silently leaving the card.
+- **Auth the webhook:** the endpoint must reject calls that aren't from our
+  workflow (shared secret header configured in the workflow's webhook action).
+- Investigations take ~10 minutes and the job store is in-memory — a deploy/restart
+  mid-run loses the job; the card must not be stranded in a "processing" state
+  with no retry path.

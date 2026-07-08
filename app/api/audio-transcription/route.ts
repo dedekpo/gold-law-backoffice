@@ -24,7 +24,7 @@ export async function POST(request: Request) {
     const done = log.start("model.transcribe");
     const { text } = await runRateLimited(() =>
       generateText({
-        model: model(MODELS.media),
+        model: model(MODELS.audio),
         maxRetries: 0,
         temperature: 0,
         messages: [

@@ -28,7 +28,6 @@ export async function POST(request: Request) {
       generateText({
         model: model(MODELS.media),
         maxRetries: 0,
-        temperature: 0,
         messages: [
           {
             role: "user",

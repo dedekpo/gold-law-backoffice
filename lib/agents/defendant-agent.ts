@@ -183,9 +183,9 @@ async function loadSop(): Promise<string> {
 /**
  * The investigation agent. It loops over the search/fetch tools and ends with a
  * plain-text final report. It deliberately does NOT use structured `Output`:
- * Gemini rejects any request that combines function calling (tools) with a JSON
- * response mime type. Structuring the result is a separate, tool-free step —
- * see `formatDefendantReport`.
+ * a free-text report keeps the investigation richer (rejections, caveats, next
+ * steps), and structuring it is a separate, tool-free step — see
+ * `formatDefendantReport`.
  */
 export function getDefendantAgent() {
   if (!cachedAgent) {
@@ -195,7 +195,6 @@ export function getDefendantAgent() {
         model: rateLimitedModel(MODELS.agent),
         instructions: `${INSTRUCTIONS_PREAMBLE}${sop}`,
         tools,
-        temperature: 0,
         // A large case (many files → many phone numbers/brands to search and look
         // up) can exhaust a tight step budget before the agent writes its final
         // report, leaving zero candidates. Give it room to search, run sos_lookup,
@@ -234,7 +233,6 @@ export async function formatDefendantReport(
   const { output } = await generateText({
     model: rateLimitedModel(MODELS.agent),
     maxRetries: 0,
-    temperature: 0,
     output: Output.object({ schema: defendantReportSchema }),
     system: FORMAT_INSTRUCTIONS,
     prompt: `${fileList}${report}`,
@@ -357,7 +355,6 @@ function getEnrichmentAgent() {
         model: rateLimitedModel(MODELS.agent),
         instructions: ENRICHMENT_INSTRUCTIONS,
         tools: enrichmentTools,
-        temperature: 0,
         // Bounded: a handful of searches/fetches to size up one known company.
         stopWhen: stepCountIs(10),
         maxRetries: 0,
@@ -394,7 +391,6 @@ export async function enrichConfirmedEntity(params: {
   const { output } = await generateText({
     model: rateLimitedModel(MODELS.agent),
     maxRetries: 0,
-    temperature: 0,
     output: Output.object({ schema: enrichmentSchema }),
     system: ENRICHMENT_FORMAT_INSTRUCTIONS,
     prompt: `${fileList}${result.text}`,
