@@ -1,0 +1,770 @@
+2026-07-09T14:24:18.584729723Z [err]  npm warn config production Use `--omit=dev` instead.
+2026-07-09T14:24:18.584734891Z [inf]  
+2026-07-09T14:24:18.584739935Z [inf]  > backoffice@0.1.0 start
+2026-07-09T14:24:18.584744949Z [inf]  > next start
+2026-07-09T14:24:18.584751033Z [inf]  
+2026-07-09T14:24:18.660120293Z [inf]  Starting Container
+2026-07-09T14:24:18.761716315Z [inf]  ▲ Next.js 16.2.9
+2026-07-09T14:24:18.761721987Z [inf]  - Local:         http://localhost:8080
+2026-07-09T14:24:18.761726638Z [inf]  - Network:       http://10.159.16.38:8080
+2026-07-09T14:24:18.761731994Z [inf]  ✓ Ready in 126ms
+2026-07-09T14:25:09.045326553Z [inf]  [2026-07-09T14:25:03.797Z] [image-desc#001] model.describe …
+2026-07-09T14:25:09.045414321Z [inf]  [2026-07-09T14:25:03.797Z] [image-desc#001] request received mediaType=image/jpeg bytes=133023
+2026-07-09T14:25:38.783496810Z [inf]  [2026-07-09T14:25:29.782Z] [image-desc#001] model.describe ok ms=25984 textChars=5401
+2026-07-09T14:25:58.782632748Z [inf]  [2026-07-09T14:25:51.475Z] [extract-screen#002] request received files=1 kinds=image
+2026-07-09T14:25:58.782639407Z [inf]  [2026-07-09T14:25:51.476Z] [extract-screen#002] model.extract …
+2026-07-09T14:25:58.782643776Z [inf]  [2026-07-09T14:25:58.577Z] [extract-screen#002] model.extract ok ms=7101 contacts=1 declined=false
+2026-07-09T14:25:59.000350403Z [inf]  [2026-07-09T14:25:58.996Z] [defendant-id#003] request received files=1 kinds=image hasFacts=true contacts=1
+2026-07-09T14:25:59.000356820Z [inf]  [2026-07-09T14:25:58.996Z] [defendant-id#003] investigation queued jobId=7596a2ca-99c9-4190-8252-a34a96c4fbf3
+2026-07-09T14:25:59.001801461Z [inf]  [2026-07-09T14:25:59.000Z] [defendant-id#003] agent.investigate …
+2026-07-09T14:26:01.541797438Z [inf]  [2026-07-09T14:26:01.534Z] [defendant-tools] web_search … query=novactn.com clinical trial text
+2026-07-09T14:26:01.541805187Z [inf]  [2026-07-09T14:26:01.534Z] [defendant-tools] web_search … query="877-691-8341"
+2026-07-09T14:26:01.541810174Z [inf]  [2026-07-09T14:26:01.535Z] [defendant-tools] web_search … query=NCTN clinical trial text message spam
+2026-07-09T14:26:41.614036037Z [inf]  [2026-07-09T14:26:39.722Z] [defendant-tools] web_search ok ms=38188 answerChars=2588 sources=28
+2026-07-09T14:27:11.381359172Z [inf]  [2026-07-09T14:27:07.689Z] [defendant-tools] web_search ok ms=66155 answerChars=1687 sources=81
+2026-07-09T14:27:41.386148876Z [inf]  [2026-07-09T14:27:37.252Z] [defendant-tools] web_search ok ms=95717 answerChars=3265 sources=89
+2026-07-09T14:27:41.386156096Z [inf]  [2026-07-09T14:27:39.492Z] [defendant-tools] fetch_page … url=https://novactn.com/
+2026-07-09T14:27:41.386160700Z [inf]  [2026-07-09T14:27:39.494Z] [defendant-tools] web_search … query=novactn.com terms of service LLC
+2026-07-09T14:27:41.386164807Z [inf]  [2026-07-09T14:27:39.531Z] [defendant-tools] fetch_page ok ms=39 status=200 textChars=2260
+2026-07-09T14:28:11.392046457Z [inf]  [2026-07-09T14:28:09.992Z] [defendant-tools] web_search ok ms=30498 answerChars=2052 sources=51
+2026-07-09T14:28:13.647258732Z [inf]  [2026-07-09T14:28:13.642Z] [defendant-tools] sos_lookup … entity_name=Atlas Medical Research Group LLC state=WY
+2026-07-09T14:28:13.647265816Z [inf]  [2026-07-09T14:28:13.644Z] [defendant-tools] web_search … query="Atlas Medical Research Group LLC" employees linkedin
+2026-07-09T14:28:13.942405052Z [inf]  [2026-07-09T14:28:13.915Z] [defendant-tools] sos_lookup ok ms=273 result=found entity=Atlas Medical Research Group LLC
+2026-07-09T14:29:13.949650691Z [inf]  [2026-07-09T14:29:10.331Z] [defendant-tools] web_search ok ms=56687 answerChars=2268 sources=27
+2026-07-09T14:29:33.983078239Z [inf]  [2026-07-09T14:29:33.730Z] [defendant-id#003] agent.investigate ok ms=214730 steps=4 reportChars=4435
+2026-07-09T14:29:33.983083301Z [inf]  [2026-07-09T14:29:33.730Z] [defendant-id#003] agent.format …
+2026-07-09T14:29:42.433646652Z [inf]  [2026-07-09T14:29:42.421Z] [defendant-id#003] agent.format ok ms=8691 candidates=1 companies=Nova Clinical Trial Group (NCTN)
+2026-07-09T14:29:42.433650472Z [inf]  [2026-07-09T14:29:42.421Z] [defendant-tools] sos_lookup … entity_name=Atlas Medical Research Group LLC state=FL
+2026-07-09T14:31:52.954198252Z [inf]  [2026-07-09T14:31:48.143Z] [defendant-tools] sos_lookup ok ms=125722 result=found entity=ATLAS MEDICAL SERVICES, LLC
+2026-07-09T14:31:52.954203938Z [inf]  [2026-07-09T14:31:48.146Z] [defendant-id#003] companies scored companies=1 bands=pass
+2026-07-09T14:31:52.954210015Z [inf]  [2026-07-09T14:31:48.146Z] [defendant-id#003] sos lookups summarized attempts=1 flCrossLookups=1 found=1 attached=1 synthesized=0 errors=0
+2026-07-09T14:36:24.274728427Z [inf]  [2026-07-09T14:36:16.880Z] [image-desc#004] request received mediaType=image/png bytes=316560
+2026-07-09T14:36:24.274741910Z [inf]  [2026-07-09T14:36:16.880Z] [image-desc#004] model.describe …
+2026-07-09T14:36:24.274749211Z [inf]  [2026-07-09T14:36:16.918Z] [image-desc#005] request received mediaType=image/png bytes=458700
+2026-07-09T14:36:24.274754564Z [inf]  [2026-07-09T14:36:16.919Z] [image-desc#005] model.describe …
+2026-07-09T14:36:24.274909940Z [inf]  [2026-07-09T14:36:16.772Z] [image-desc#007] request received mediaType=image/png bytes=205879
+2026-07-09T14:36:24.274914059Z [inf]  [2026-07-09T14:36:16.772Z] [image-desc#007] model.describe …
+2026-07-09T14:36:24.274918447Z [inf]  [2026-07-09T14:36:16.832Z] [image-desc#006] request received mediaType=image/png bytes=186124
+2026-07-09T14:36:24.274921868Z [inf]  [2026-07-09T14:36:16.832Z] [image-desc#006] model.describe …
+2026-07-09T14:36:44.090273862Z [inf]  [2026-07-09T14:36:37.447Z] [image-desc#006] model.describe ok ms=20615 textChars=4720
+2026-07-09T14:36:44.090284204Z [inf]  [2026-07-09T14:36:38.136Z] [image-desc#008] request received mediaType=image/png bytes=340190
+2026-07-09T14:36:44.090292940Z [inf]  [2026-07-09T14:36:38.137Z] [image-desc#008] model.describe …
+2026-07-09T14:36:44.090303875Z [inf]  [2026-07-09T14:36:38.303Z] [image-desc#007] model.describe ok ms=21531 textChars=4957
+2026-07-09T14:36:44.090308689Z [inf]  [2026-07-09T14:36:39.004Z] [image-desc#009] request received mediaType=image/png bytes=395905
+2026-07-09T14:36:44.090314441Z [inf]  [2026-07-09T14:36:39.004Z] [image-desc#009] model.describe …
+2026-07-09T14:36:44.090320339Z [inf]  [2026-07-09T14:36:40.885Z] [image-desc#005] model.describe ok ms=23966 textChars=5812
+2026-07-09T14:36:44.090325760Z [inf]  [2026-07-09T14:36:41.401Z] [image-desc#00a] request received mediaType=image/png bytes=196699
+2026-07-09T14:36:44.090331482Z [inf]  [2026-07-09T14:36:41.401Z] [image-desc#00a] model.describe …
+2026-07-09T14:36:44.090336035Z [inf]  [2026-07-09T14:36:43.653Z] [image-desc#004] model.describe ok ms=26773 textChars=6278
+2026-07-09T14:36:44.459694815Z [inf]  [2026-07-09T14:36:44.346Z] [image-desc#00b] request received mediaType=image/png bytes=338163
+2026-07-09T14:36:44.459699310Z [inf]  [2026-07-09T14:36:44.346Z] [image-desc#00b] model.describe …
+2026-07-09T14:37:04.283597924Z [inf]  [2026-07-09T14:37:00.789Z] [image-desc#00a] model.describe ok ms=19388 textChars=4329
+2026-07-09T14:37:04.283607636Z [inf]  [2026-07-09T14:37:01.398Z] [image-desc#00c] request received mediaType=image/png bytes=205218
+2026-07-09T14:37:04.283613376Z [inf]  [2026-07-09T14:37:01.398Z] [image-desc#00c] model.describe …
+2026-07-09T14:37:04.283621121Z [inf]  [2026-07-09T14:37:02.221Z] [image-desc#009] model.describe ok ms=23217 textChars=5278
+2026-07-09T14:37:04.283626372Z [inf]  [2026-07-09T14:37:02.870Z] [image-desc#00d] request received mediaType=image/png bytes=259899
+2026-07-09T14:37:04.283630404Z [inf]  [2026-07-09T14:37:02.870Z] [image-desc#00d] model.describe …
+2026-07-09T14:37:04.283634652Z [inf]  [2026-07-09T14:37:03.502Z] [image-desc#008] model.describe ok ms=25365 textChars=6054
+2026-07-09T14:37:04.283638644Z [inf]  [2026-07-09T14:37:03.855Z] [image-desc#00b] model.describe ok ms=19509 textChars=4330
+2026-07-09T14:37:04.283642709Z [inf]  [2026-07-09T14:37:04.113Z] [image-desc#00e] request received mediaType=image/png bytes=237311
+2026-07-09T14:37:04.283647738Z [inf]  [2026-07-09T14:37:04.113Z] [image-desc#00e] model.describe …
+2026-07-09T14:37:04.683968405Z [inf]  [2026-07-09T14:37:04.450Z] [image-desc#00f] request received mediaType=image/png bytes=214554
+2026-07-09T14:37:04.683976084Z [inf]  [2026-07-09T14:37:04.450Z] [image-desc#00f] model.describe …
+2026-07-09T14:37:24.469432986Z [inf]  [2026-07-09T14:37:19.236Z] [image-desc#00c] model.describe ok ms=17838 textChars=4307
+2026-07-09T14:37:24.469440989Z [inf]  [2026-07-09T14:37:19.920Z] [image-desc#00g] request received mediaType=image/png bytes=411655
+2026-07-09T14:37:24.469448347Z [inf]  [2026-07-09T14:37:19.920Z] [image-desc#00g] model.describe …
+2026-07-09T14:37:26.068209576Z [inf]  [2026-07-09T14:37:26.066Z] [image-desc#00e] model.describe ok ms=21953 textChars=5316
+2026-07-09T14:37:26.891001078Z [inf]  [2026-07-09T14:37:26.768Z] [image-desc#00h] request received mediaType=image/png bytes=425065
+2026-07-09T14:37:26.891007063Z [inf]  [2026-07-09T14:37:26.768Z] [image-desc#00h] model.describe …
+2026-07-09T14:37:29.914025772Z [inf]  [2026-07-09T14:37:29.809Z] [image-desc#00d] model.describe ok ms=26939 textChars=6378
+2026-07-09T14:37:30.436547011Z [inf]  [2026-07-09T14:37:30.435Z] [image-desc#00i] request received mediaType=image/png bytes=189758
+2026-07-09T14:37:30.436552133Z [inf]  [2026-07-09T14:37:30.435Z] [image-desc#00i] model.describe …
+2026-07-09T14:37:31.928498993Z [inf]  [2026-07-09T14:37:31.717Z] [image-desc#00f] model.describe ok ms=27267 textChars=6079
+2026-07-09T14:37:32.019832399Z [inf]  [2026-07-09T14:37:32.018Z] [image-desc#00j] request received mediaType=image/png bytes=165704
+2026-07-09T14:37:32.019837942Z [inf]  [2026-07-09T14:37:32.018Z] [image-desc#00j] model.describe …
+2026-07-09T14:37:39.494702347Z [inf]  [2026-07-09T14:37:39.484Z] [image-desc#00g] model.describe ok ms=19564 textChars=4509
+2026-07-09T14:37:40.197715230Z [inf]  [2026-07-09T14:37:40.184Z] [image-desc#00k] request received mediaType=image/png bytes=386679
+2026-07-09T14:37:40.197722789Z [inf]  [2026-07-09T14:37:40.184Z] [image-desc#00k] model.describe …
+2026-07-09T14:38:00.193580923Z [inf]  [2026-07-09T14:37:52.648Z] [image-desc#00j] model.describe ok ms=20630 textChars=4730
+2026-07-09T14:38:00.193594161Z [inf]  [2026-07-09T14:37:52.949Z] [image-desc#00h] model.describe ok ms=26181 textChars=6273
+2026-07-09T14:38:00.193603383Z [inf]  [2026-07-09T14:37:53.249Z] [image-desc#00l] request received mediaType=image/png bytes=156658
+2026-07-09T14:38:00.193609329Z [inf]  [2026-07-09T14:37:53.249Z] [image-desc#00l] model.describe …
+2026-07-09T14:38:00.193615203Z [inf]  [2026-07-09T14:37:53.618Z] [image-desc#00m] request received mediaType=image/png bytes=313078
+2026-07-09T14:38:00.193622318Z [inf]  [2026-07-09T14:37:53.618Z] [image-desc#00m] model.describe …
+2026-07-09T14:38:00.193628787Z [inf]  [2026-07-09T14:37:54.996Z] [image-desc#00i] model.describe ok ms=24561 textChars=5728
+2026-07-09T14:38:00.193634437Z [inf]  [2026-07-09T14:37:55.354Z] [image-desc#00n] request received mediaType=image/png bytes=259528
+2026-07-09T14:38:00.193647069Z [inf]  [2026-07-09T14:37:55.354Z] [image-desc#00n] model.describe …
+2026-07-09T14:38:06.193509714Z [inf]  [2026-07-09T14:38:05.908Z] [image-desc#00k] model.describe ok ms=25724 textChars=5970
+2026-07-09T14:38:06.571724840Z [inf]  [2026-07-09T14:38:06.569Z] [image-desc#00o] request received mediaType=image/png bytes=274575
+2026-07-09T14:38:06.571732855Z [inf]  [2026-07-09T14:38:06.569Z] [image-desc#00o] model.describe …
+2026-07-09T14:38:10.566349306Z [inf]  [2026-07-09T14:38:10.564Z] [image-desc#00l] model.describe ok ms=17315 textChars=4134
+2026-07-09T14:38:11.309018501Z [inf]  [2026-07-09T14:38:11.289Z] [image-desc#00p] request received mediaType=image/png bytes=417688
+2026-07-09T14:38:11.309026324Z [inf]  [2026-07-09T14:38:11.289Z] [image-desc#00p] model.describe …
+2026-07-09T14:38:15.566315694Z [inf]  [2026-07-09T14:38:15.545Z] [image-desc#00m] model.describe ok ms=21927 textChars=5066
+2026-07-09T14:38:16.320861534Z [inf]  [2026-07-09T14:38:16.041Z] [image-desc#00n] model.describe ok ms=20687 textChars=5050
+2026-07-09T14:38:16.320866831Z [inf]  [2026-07-09T14:38:16.212Z] [image-desc#00q] request received mediaType=image/png bytes=305547
+2026-07-09T14:38:16.320872437Z [inf]  [2026-07-09T14:38:16.213Z] [image-desc#00q] model.describe …
+2026-07-09T14:38:16.682316005Z [inf]  [2026-07-09T14:38:16.655Z] [image-desc#00r] request received mediaType=image/png bytes=214509
+2026-07-09T14:38:16.682321662Z [inf]  [2026-07-09T14:38:16.655Z] [image-desc#00r] model.describe …
+2026-07-09T14:38:36.688179289Z [inf]  [2026-07-09T14:38:28.317Z] [image-desc#00o] model.describe ok ms=21748 textChars=5110
+2026-07-09T14:38:36.688183479Z [inf]  [2026-07-09T14:38:29.029Z] [image-desc#00s] request received mediaType=image/png bytes=382549
+2026-07-09T14:38:36.688187388Z [inf]  [2026-07-09T14:38:29.029Z] [image-desc#00s] model.describe …
+2026-07-09T14:38:40.187107574Z [inf]  [2026-07-09T14:38:40.179Z] [image-desc#00p] model.describe ok ms=28890 textChars=5946
+2026-07-09T14:38:40.674595583Z [inf]  [2026-07-09T14:38:40.669Z] [image-desc#00q] model.describe ok ms=24456 textChars=6189
+2026-07-09T14:38:40.857644969Z [inf]  [2026-07-09T14:38:40.833Z] [image-desc#00t] request received mediaType=image/png bytes=252001
+2026-07-09T14:38:40.857651463Z [inf]  [2026-07-09T14:38:40.833Z] [image-desc#00t] model.describe …
+2026-07-09T14:38:41.570069764Z [inf]  [2026-07-09T14:38:41.273Z] [image-desc#00u] request received mediaType=image/png bytes=135338
+2026-07-09T14:38:41.570075847Z [inf]  [2026-07-09T14:38:41.273Z] [image-desc#00u] model.describe …
+2026-07-09T14:38:41.570081178Z [inf]  [2026-07-09T14:38:41.517Z] [image-desc#00r] model.describe ok ms=24862 textChars=5859
+2026-07-09T14:38:41.832037141Z [inf]  [2026-07-09T14:38:41.825Z] [image-desc#00v] request received mediaType=image/png bytes=127881
+2026-07-09T14:38:41.832045084Z [inf]  [2026-07-09T14:38:41.825Z] [image-desc#00v] model.describe …
+2026-07-09T14:39:01.859179163Z [inf]  [2026-07-09T14:38:53.173Z] [image-desc#00s] model.describe ok ms=24144 textChars=5889
+2026-07-09T14:39:01.859183532Z [inf]  [2026-07-09T14:38:53.733Z] [image-desc#00w] request received mediaType=image/png bytes=111624
+2026-07-09T14:39:01.859189972Z [inf]  [2026-07-09T14:38:53.733Z] [image-desc#00w] model.describe …
+2026-07-09T14:39:01.859194599Z [inf]  [2026-07-09T14:38:58.553Z] [image-desc#00u] model.describe ok ms=17280 textChars=3891
+2026-07-09T14:39:01.859198478Z [inf]  [2026-07-09T14:38:59.258Z] [image-desc#00x] request received mediaType=image/png bytes=416989
+2026-07-09T14:39:01.859202273Z [inf]  [2026-07-09T14:38:59.258Z] [image-desc#00x] model.describe …
+2026-07-09T14:39:01.859206590Z [inf]  [2026-07-09T14:39:00.254Z] [image-desc#00v] model.describe ok ms=18429 textChars=4402
+2026-07-09T14:39:01.859211334Z [inf]  [2026-07-09T14:39:00.875Z] [image-desc#00y] request received mediaType=image/png bytes=172116
+2026-07-09T14:39:01.859215272Z [inf]  [2026-07-09T14:39:00.875Z] [image-desc#00y] model.describe …
+2026-07-09T14:39:01.859218973Z [inf]  [2026-07-09T14:39:01.730Z] [image-desc#00t] model.describe ok ms=20897 textChars=5168
+2026-07-09T14:39:02.374351433Z [inf]  [2026-07-09T14:39:02.371Z] [image-desc#00z] request received mediaType=image/png bytes=185774
+2026-07-09T14:39:02.374357778Z [inf]  [2026-07-09T14:39:02.371Z] [image-desc#00z] model.describe …
+2026-07-09T14:39:10.237580804Z [inf]  [2026-07-09T14:39:10.228Z] [image-desc#00w] model.describe ok ms=16495 textChars=3942
+2026-07-09T14:39:10.804728108Z [inf]  [2026-07-09T14:39:10.802Z] [image-desc#010] request received mediaType=image/png bytes=120328
+2026-07-09T14:39:10.804735995Z [inf]  [2026-07-09T14:39:10.802Z] [image-desc#010] model.describe …
+2026-07-09T14:39:30.576068926Z [inf]  [2026-07-09T14:39:22.885Z] [image-desc#00y] model.describe ok ms=22010 textChars=5124
+2026-07-09T14:39:30.576073398Z [inf]  [2026-07-09T14:39:23.464Z] [image-desc#011] request received mediaType=image/png bytes=116180
+2026-07-09T14:39:30.576078519Z [inf]  [2026-07-09T14:39:23.464Z] [image-desc#011] model.describe …
+2026-07-09T14:39:30.576083352Z [inf]  [2026-07-09T14:39:24.662Z] [image-desc#00x] model.describe ok ms=25404 textChars=6216
+2026-07-09T14:39:30.576087316Z [inf]  [2026-07-09T14:39:25.261Z] [image-desc#012] request received mediaType=image/png bytes=189024
+2026-07-09T14:39:30.576091574Z [inf]  [2026-07-09T14:39:25.261Z] [image-desc#012] model.describe …
+2026-07-09T14:39:30.576098219Z [inf]  [2026-07-09T14:39:28.856Z] [image-desc#00z] model.describe ok ms=26485 textChars=6402
+2026-07-09T14:39:30.576103404Z [inf]  [2026-07-09T14:39:29.461Z] [image-desc#013] request received mediaType=image/png bytes=160153
+2026-07-09T14:39:30.576108747Z [inf]  [2026-07-09T14:39:29.461Z] [image-desc#013] model.describe …
+2026-07-09T14:39:34.620791578Z [inf]  [2026-07-09T14:39:34.618Z] [image-desc#010] model.describe ok ms=23816 textChars=4666
+2026-07-09T14:39:35.211113477Z [inf]  [2026-07-09T14:39:35.209Z] [image-desc#014] request received mediaType=image/png bytes=131721
+2026-07-09T14:39:35.211117841Z [inf]  [2026-07-09T14:39:35.209Z] [image-desc#014] model.describe …
+2026-07-09T14:39:41.999317723Z [inf]  [2026-07-09T14:39:41.896Z] [image-desc#011] model.describe ok ms=18432 textChars=4330
+2026-07-09T14:39:42.493642741Z [inf]  [2026-07-09T14:39:42.491Z] [image-desc#015] request received mediaType=image/png bytes=148988
+2026-07-09T14:39:42.493650421Z [inf]  [2026-07-09T14:39:42.491Z] [image-desc#015] model.describe …
+2026-07-09T14:39:46.049330430Z [inf]  [2026-07-09T14:39:45.936Z] [image-desc#012] model.describe ok ms=20675 textChars=5535
+2026-07-09T14:39:46.547275206Z [inf]  [2026-07-09T14:39:46.536Z] [image-desc#016] request received mediaType=image/png bytes=151328
+2026-07-09T14:39:46.547278948Z [inf]  [2026-07-09T14:39:46.537Z] [image-desc#016] model.describe …
+2026-07-09T14:39:52.242059486Z [inf]  [2026-07-09T14:39:52.222Z] [image-desc#013] model.describe ok ms=22761 textChars=4948
+2026-07-09T14:39:53.116052958Z [inf]  [2026-07-09T14:39:52.847Z] [image-desc#017] request received mediaType=image/png bytes=202339
+2026-07-09T14:39:53.116062691Z [inf]  [2026-07-09T14:39:52.848Z] [image-desc#017] model.describe …
+2026-07-09T14:39:54.590451091Z [inf]  [2026-07-09T14:39:54.581Z] [image-desc#014] model.describe ok ms=19372 textChars=4692
+2026-07-09T14:39:55.223222302Z [inf]  [2026-07-09T14:39:55.215Z] [image-desc#018] request received mediaType=image/png bytes=214999
+2026-07-09T14:39:55.223227588Z [inf]  [2026-07-09T14:39:55.215Z] [image-desc#018] model.describe …
+2026-07-09T14:40:01.151892929Z [inf]  [2026-07-09T14:40:00.966Z] [image-desc#015] model.describe ok ms=18475 textChars=4430
+2026-07-09T14:40:01.550346787Z [inf]  [2026-07-09T14:40:01.540Z] [image-desc#019] request received mediaType=image/png bytes=123735
+2026-07-09T14:40:01.550353360Z [inf]  [2026-07-09T14:40:01.540Z] [image-desc#019] model.describe …
+2026-07-09T14:40:21.547037014Z [inf]  [2026-07-09T14:40:11.701Z] [image-desc#016] model.describe ok ms=25164 textChars=4968
+2026-07-09T14:40:21.547043036Z [inf]  [2026-07-09T14:40:12.381Z] [image-desc#01a] request received mediaType=image/png bytes=153240
+2026-07-09T14:40:21.547047395Z [inf]  [2026-07-09T14:40:12.381Z] [image-desc#01a] model.describe …
+2026-07-09T14:40:21.547052105Z [inf]  [2026-07-09T14:40:16.996Z] [image-desc#018] model.describe ok ms=21781 textChars=4863
+2026-07-09T14:40:21.547055952Z [inf]  [2026-07-09T14:40:17.606Z] [image-desc#01b] request received mediaType=image/png bytes=168607
+2026-07-09T14:40:21.547059995Z [inf]  [2026-07-09T14:40:17.606Z] [image-desc#01b] model.describe …
+2026-07-09T14:40:21.547065200Z [inf]  [2026-07-09T14:40:18.418Z] [image-desc#017] model.describe ok ms=25570 textChars=5725
+2026-07-09T14:40:21.547069835Z [inf]  [2026-07-09T14:40:19.134Z] [image-desc#01c] request received mediaType=image/png bytes=115241
+2026-07-09T14:40:21.547075390Z [inf]  [2026-07-09T14:40:19.134Z] [image-desc#01c] model.describe …
+2026-07-09T14:40:21.547079553Z [inf]  [2026-07-09T14:40:19.222Z] [image-desc#019] model.describe ok ms=17682 textChars=3773
+2026-07-09T14:40:21.547083058Z [inf]  [2026-07-09T14:40:19.804Z] [image-desc#01d] request received mediaType=image/png bytes=137620
+2026-07-09T14:40:21.547086794Z [inf]  [2026-07-09T14:40:19.804Z] [image-desc#01d] model.describe …
+2026-07-09T14:40:41.552541955Z [inf]  [2026-07-09T14:40:32.975Z] [image-desc#01a] model.describe ok ms=20594 textChars=5083
+2026-07-09T14:40:41.552548076Z [inf]  [2026-07-09T14:40:33.621Z] [image-desc#01e] request received mediaType=image/png bytes=213781
+2026-07-09T14:40:41.552551799Z [inf]  [2026-07-09T14:40:33.621Z] [image-desc#01e] model.describe …
+2026-07-09T14:40:41.552556304Z [inf]  [2026-07-09T14:40:37.211Z] [image-desc#01d] model.describe ok ms=17407 textChars=4456
+2026-07-09T14:40:41.552560309Z [inf]  [2026-07-09T14:40:37.221Z] [image-desc#01b] model.describe ok ms=19615 textChars=4695
+2026-07-09T14:40:41.552564158Z [inf]  [2026-07-09T14:40:37.817Z] [image-desc#01f] request received mediaType=image/png bytes=167657
+2026-07-09T14:40:41.552569067Z [inf]  [2026-07-09T14:40:37.817Z] [image-desc#01f] model.describe …
+2026-07-09T14:40:41.552572718Z [inf]  [2026-07-09T14:40:37.888Z] [image-desc#01g] request received mediaType=image/png bytes=151331
+2026-07-09T14:40:41.552576257Z [inf]  [2026-07-09T14:40:37.888Z] [image-desc#01g] model.describe …
+2026-07-09T14:40:41.552580087Z [inf]  [2026-07-09T14:40:37.914Z] [image-desc#01c] model.describe ok ms=18780 textChars=4605
+2026-07-09T14:40:41.552583624Z [inf]  [2026-07-09T14:40:38.596Z] [image-desc#01h] request received mediaType=image/png bytes=289465
+2026-07-09T14:40:41.552588455Z [inf]  [2026-07-09T14:40:38.597Z] [image-desc#01h] model.describe …
+2026-07-09T14:41:01.294884557Z [inf]  [2026-07-09T14:40:57.760Z] [image-desc#01e] model.describe ok ms=24139 textChars=5892
+2026-07-09T14:41:01.294891994Z [inf]  [2026-07-09T14:40:58.366Z] [image-desc#01i] request received mediaType=image/png bytes=156686
+2026-07-09T14:41:01.294897463Z [inf]  [2026-07-09T14:40:58.367Z] [image-desc#01i] model.describe …
+2026-07-09T14:41:01.294902571Z [inf]  [2026-07-09T14:40:59.723Z] [image-desc#01f] model.describe ok ms=21906 textChars=4996
+2026-07-09T14:41:01.294907828Z [inf]  [2026-07-09T14:41:00.362Z] [image-desc#01j] request received mediaType=image/png bytes=193567
+2026-07-09T14:41:01.294913041Z [inf]  [2026-07-09T14:41:00.362Z] [image-desc#01j] model.describe …
+2026-07-09T14:41:02.281698424Z [inf]  [2026-07-09T14:41:02.251Z] [image-desc#01h] model.describe ok ms=23654 textChars=5620
+2026-07-09T14:41:02.950959549Z [inf]  [2026-07-09T14:41:02.948Z] [image-desc#01k] request received mediaType=image/png bytes=362333
+2026-07-09T14:41:02.950967700Z [inf]  [2026-07-09T14:41:02.949Z] [image-desc#01k] model.describe …
+2026-07-09T14:41:03.092312061Z [inf]  [2026-07-09T14:41:03.083Z] [image-desc#01g] model.describe ok ms=25195 textChars=5545
+2026-07-09T14:41:03.673387698Z [inf]  [2026-07-09T14:41:03.403Z] [image-desc#01l] request received mediaType=image/png bytes=175178
+2026-07-09T14:41:03.673393037Z [inf]  [2026-07-09T14:41:03.404Z] [image-desc#01l] model.describe …
+2026-07-09T14:41:23.423387765Z [inf]  [2026-07-09T14:41:17.541Z] [image-desc#01i] model.describe ok ms=19174 textChars=4723
+2026-07-09T14:41:23.423393588Z [inf]  [2026-07-09T14:41:18.199Z] [image-desc#01m] request received mediaType=image/png bytes=255444
+2026-07-09T14:41:23.423399909Z [inf]  [2026-07-09T14:41:18.199Z] [image-desc#01m] model.describe …
+2026-07-09T14:41:23.423406628Z [inf]  [2026-07-09T14:41:21.059Z] [image-desc#01j] model.describe ok ms=20697 textChars=5085
+2026-07-09T14:41:23.423412729Z [inf]  [2026-07-09T14:41:21.764Z] [image-desc#01n] request received mediaType=image/png bytes=241701
+2026-07-09T14:41:23.423419644Z [inf]  [2026-07-09T14:41:21.764Z] [image-desc#01n] model.describe …
+2026-07-09T14:41:23.947533271Z [inf]  [2026-07-09T14:41:23.912Z] [image-desc#01l] model.describe ok ms=20508 textChars=4458
+2026-07-09T14:41:23.947539696Z [inf]  [2026-07-09T14:41:23.917Z] [image-desc#01k] model.describe ok ms=20968 textChars=5233
+2026-07-09T14:41:24.804742279Z [inf]  [2026-07-09T14:41:24.505Z] [image-desc#01o] request received mediaType=image/png bytes=142436
+2026-07-09T14:41:24.804749356Z [inf]  [2026-07-09T14:41:24.505Z] [image-desc#01o] model.describe …
+2026-07-09T14:41:24.804756235Z [inf]  [2026-07-09T14:41:24.551Z] [image-desc#01p] request received mediaType=image/png bytes=123103
+2026-07-09T14:41:24.804762112Z [inf]  [2026-07-09T14:41:24.551Z] [image-desc#01p] model.describe …
+2026-07-09T14:41:44.555687088Z [inf]  [2026-07-09T14:41:40.300Z] [image-desc#01m] model.describe ok ms=22101 textChars=4848
+2026-07-09T14:41:44.555697927Z [inf]  [2026-07-09T14:41:40.443Z] [image-desc#01n] model.describe ok ms=18679 textChars=4249
+2026-07-09T14:41:44.555702976Z [inf]  [2026-07-09T14:41:41.689Z] [image-desc#01o] model.describe ok ms=17184 textChars=4045
+2026-07-09T14:41:44.555709620Z [inf]  [2026-07-09T14:41:44.059Z] [image-desc#01p] model.describe ok ms=19508 textChars=4158
+2026-07-09T14:41:51.612778813Z [inf]  [2026-07-09T14:41:51.602Z] [extract-screen#01q] request received files=58 kinds=image,image,image,image,image,image,image,image,image,image,image,image,image,image,image,image,image,image,image,image,image,image,image,image,image,image,image,image,image,image,image,image,image,image,image,image,image,image,image,image,image,image,image,image,image,image,image,image,image,image,image,image,image,image,image,image,image,image
+2026-07-09T14:41:51.612784651Z [inf]  [2026-07-09T14:41:51.602Z] [extract-screen#01q] model.extract …
+2026-07-09T14:46:53.858053941Z [err]  [2026-07-09T14:46:52.859Z] [rate-limit] retryable error from provider, backing off before retry attempt=1 maxRetries=6 backoffMs=4080 source=exponential reason=Cannot connect to API: Headers Timeout Error
+2026-07-09T14:48:13.703290195Z [inf]  [2026-07-09T14:48:08.668Z] [image-desc#01t] request received mediaType=image/png bytes=186124
+2026-07-09T14:48:13.703296089Z [inf]  [2026-07-09T14:48:08.669Z] [image-desc#01t] model.describe …
+2026-07-09T14:48:13.703300484Z [inf]  [2026-07-09T14:48:08.692Z] [image-desc#01u] request received mediaType=image/png bytes=205879
+2026-07-09T14:48:13.703305280Z [inf]  [2026-07-09T14:48:08.692Z] [image-desc#01u] model.describe …
+2026-07-09T14:48:13.703309950Z [inf]  [2026-07-09T14:48:08.757Z] [image-desc#01r] request received mediaType=image/png bytes=316560
+2026-07-09T14:48:13.703313320Z [inf]  [2026-07-09T14:48:08.757Z] [image-desc#01r] model.describe …
+2026-07-09T14:48:13.703316640Z [inf]  [2026-07-09T14:48:08.851Z] [image-desc#01s] request received mediaType=image/png bytes=458700
+2026-07-09T14:48:13.703324750Z [inf]  [2026-07-09T14:48:08.851Z] [image-desc#01s] model.describe …
+2026-07-09T14:48:33.695686041Z [inf]  [2026-07-09T14:48:29.462Z] [image-desc#01z] model.describe …
+2026-07-09T14:48:33.695699562Z [inf]  [2026-07-09T14:48:31.685Z] [image-desc#01r] model.describe ok ms=22928 textChars=5390
+2026-07-09T14:48:33.695705846Z [inf]  [2026-07-09T14:48:32.391Z] [image-desc#020] request received mediaType=image/png bytes=395905
+2026-07-09T14:48:33.695710912Z [inf]  [2026-07-09T14:48:32.392Z] [image-desc#020] model.describe …
+2026-07-09T14:48:33.695720211Z [inf]  [2026-07-09T14:48:33.594Z] [image-desc#01t] model.describe ok ms=24925 textChars=5970
+2026-07-09T14:48:33.695722270Z [inf]  [2026-07-09T14:48:28.128Z] [image-desc#01y] request received mediaType=image/png bytes=111624
+2026-07-09T14:48:33.695729184Z [inf]  [2026-07-09T14:48:28.128Z] [image-desc#01y] model.describe …
+2026-07-09T14:48:33.695734679Z [inf]  [2026-07-09T14:48:28.146Z] [image-desc#01v] request received mediaType=image/png bytes=127881
+2026-07-09T14:48:33.695738760Z [inf]  [2026-07-09T14:48:28.146Z] [image-desc#01v] model.describe …
+2026-07-09T14:48:33.695743491Z [inf]  [2026-07-09T14:48:28.189Z] [image-desc#01x] request received mediaType=image/png bytes=172116
+2026-07-09T14:48:33.695748529Z [inf]  [2026-07-09T14:48:28.189Z] [image-desc#01x] model.describe …
+2026-07-09T14:48:33.695753077Z [inf]  [2026-07-09T14:48:28.267Z] [image-desc#01w] request received mediaType=image/png bytes=416989
+2026-07-09T14:48:33.695757365Z [inf]  [2026-07-09T14:48:28.268Z] [image-desc#01w] model.describe …
+2026-07-09T14:48:33.695761701Z [inf]  [2026-07-09T14:48:28.776Z] [image-desc#01u] model.describe ok ms=20084 textChars=4713
+2026-07-09T14:48:33.695765381Z [inf]  [2026-07-09T14:48:29.462Z] [image-desc#01z] request received mediaType=image/png bytes=340190
+2026-07-09T14:48:34.224557175Z [inf]  [2026-07-09T14:48:34.216Z] [image-desc#021] request received mediaType=image/png bytes=196699
+2026-07-09T14:48:34.224569657Z [inf]  [2026-07-09T14:48:34.216Z] [image-desc#021] model.describe …
+2026-07-09T14:48:37.085439760Z [inf]  [2026-07-09T14:48:37.081Z] [image-desc#01s] model.describe ok ms=28230 textChars=6757
+2026-07-09T14:48:37.763880480Z [inf]  [2026-07-09T14:48:37.760Z] [image-desc#022] request received mediaType=image/png bytes=338163
+2026-07-09T14:48:37.763891322Z [inf]  [2026-07-09T14:48:37.761Z] [image-desc#022] model.describe …
+2026-07-09T14:48:45.364570704Z [inf]  [2026-07-09T14:48:45.360Z] [image-desc#01y] model.describe ok ms=17232 textChars=4437
+2026-07-09T14:48:45.829610038Z [inf]  [2026-07-09T14:48:45.460Z] [image-desc#01v] model.describe ok ms=17314 textChars=3693
+2026-07-09T14:48:45.984765615Z [inf]  [2026-07-09T14:48:45.980Z] [image-desc#023] request received mediaType=image/png bytes=185774
+2026-07-09T14:48:45.984772818Z [inf]  [2026-07-09T14:48:45.980Z] [image-desc#023] model.describe …
+2026-07-09T14:48:46.022649898Z [inf]  [2026-07-09T14:48:46.020Z] [image-desc#024] request received mediaType=image/png bytes=120328
+2026-07-09T14:48:46.022657872Z [inf]  [2026-07-09T14:48:46.020Z] [image-desc#024] model.describe …
+2026-07-09T14:48:53.972946522Z [inf]  [2026-07-09T14:48:53.971Z] [image-desc#01x] model.describe ok ms=25782 textChars=5536
+2026-07-09T14:48:54.870494290Z [inf]  [2026-07-09T14:48:54.684Z] [image-desc#025] request received mediaType=image/png bytes=116180
+2026-07-09T14:48:54.870498696Z [inf]  [2026-07-09T14:48:54.684Z] [image-desc#025] model.describe …
+2026-07-09T14:48:57.164128379Z [inf]  [2026-07-09T14:48:57.157Z] [image-desc#01w] model.describe ok ms=28889 textChars=5169
+2026-07-09T14:48:57.915651507Z [inf]  [2026-07-09T14:48:57.769Z] [image-desc#026] request received mediaType=image/png bytes=189024
+2026-07-09T14:48:57.915656507Z [inf]  [2026-07-09T14:48:57.770Z] [image-desc#026] model.describe …
+2026-07-09T14:49:01.898722826Z [inf]  [2026-07-09T14:49:01.698Z] [image-desc#021] model.describe ok ms=27482 textChars=3884
+2026-07-09T14:49:02.337548678Z [inf]  [2026-07-09T14:49:02.330Z] [image-desc#027] request received mediaType=image/png bytes=205218
+2026-07-09T14:49:02.337554163Z [inf]  [2026-07-09T14:49:02.330Z] [image-desc#027] model.describe …
+2026-07-09T14:49:04.175487584Z [inf]  [2026-07-09T14:49:04.174Z] [image-desc#01z] model.describe ok ms=34712 textChars=6657
+2026-07-09T14:49:04.645634384Z [inf]  [2026-07-09T14:49:04.639Z] [image-desc#020] model.describe ok ms=32247 textChars=4389
+2026-07-09T14:49:05.004303329Z [inf]  [2026-07-09T14:49:04.850Z] [image-desc#028] model.describe …
+2026-07-09T14:49:05.004382032Z [inf]  [2026-07-09T14:49:04.850Z] [image-desc#028] request received mediaType=image/png bytes=259899
+2026-07-09T14:49:05.354459274Z [inf]  [2026-07-09T14:49:05.337Z] [image-desc#029] request received mediaType=image/png bytes=237311
+2026-07-09T14:49:05.354465463Z [inf]  [2026-07-09T14:49:05.338Z] [image-desc#029] model.describe …
+2026-07-09T14:49:25.370140937Z [inf]  [2026-07-09T14:49:15.849Z] [image-desc#023] model.describe ok ms=29869 textChars=4468
+2026-07-09T14:49:25.370146688Z [inf]  [2026-07-09T14:49:16.380Z] [image-desc#02a] request received mediaType=image/png bytes=160153
+2026-07-09T14:49:25.370151823Z [inf]  [2026-07-09T14:49:16.381Z] [image-desc#02a] model.describe …
+2026-07-09T14:49:25.370156984Z [inf]  [2026-07-09T14:49:21.313Z] [image-desc#022] model.describe ok ms=43552 textChars=6227
+2026-07-09T14:49:25.370162194Z [inf]  [2026-07-09T14:49:21.944Z] [image-desc#02b] request received mediaType=image/png bytes=214554
+2026-07-09T14:49:25.370166799Z [inf]  [2026-07-09T14:49:21.944Z] [image-desc#02b] model.describe …
+2026-07-09T14:49:25.370171349Z [inf]  [2026-07-09T14:49:23.904Z] [image-desc#026] model.describe ok ms=26134 textChars=4637
+2026-07-09T14:49:25.370177124Z [inf]  [2026-07-09T14:49:23.916Z] [image-desc#024] model.describe ok ms=37896 textChars=5247
+2026-07-09T14:49:25.370182683Z [inf]  [2026-07-09T14:49:24.489Z] [image-desc#02d] request received mediaType=image/png bytes=131721
+2026-07-09T14:49:25.370186966Z [inf]  [2026-07-09T14:49:24.489Z] [image-desc#02d] model.describe …
+2026-07-09T14:49:25.370191161Z [inf]  [2026-07-09T14:49:24.568Z] [image-desc#02c] request received mediaType=image/png bytes=148988
+2026-07-09T14:49:25.370195414Z [inf]  [2026-07-09T14:49:24.568Z] [image-desc#02c] model.describe …
+2026-07-09T14:49:27.119420853Z [inf]  [2026-07-09T14:49:27.009Z] [image-desc#025] model.describe ok ms=32325 textChars=5083
+2026-07-09T14:49:27.608119699Z [inf]  [2026-07-09T14:49:27.604Z] [image-desc#02e] request received mediaType=image/png bytes=151328
+2026-07-09T14:49:27.608129948Z [inf]  [2026-07-09T14:49:27.605Z] [image-desc#02e] model.describe …
+2026-07-09T14:49:32.785684803Z [inf]  [2026-07-09T14:49:32.784Z] [image-desc#027] model.describe ok ms=30454 textChars=4358
+2026-07-09T14:49:33.491788182Z [inf]  [2026-07-09T14:49:33.488Z] [image-desc#02f] request received mediaType=image/png bytes=411655
+2026-07-09T14:49:33.491804051Z [inf]  [2026-07-09T14:49:33.489Z] [image-desc#02f] model.describe …
+2026-07-09T14:49:53.452792818Z [inf]  [2026-07-09T14:49:45.182Z] [image-desc#029] model.describe ok ms=39844 textChars=5377
+2026-07-09T14:49:53.452805233Z [inf]  [2026-07-09T14:49:45.489Z] [image-desc#02a] model.describe ok ms=29108 textChars=4826
+2026-07-09T14:49:53.452814536Z [inf]  [2026-07-09T14:49:45.904Z] [image-desc#02g] request received mediaType=image/png bytes=425065
+2026-07-09T14:49:53.452821184Z [inf]  [2026-07-09T14:49:45.904Z] [image-desc#02g] model.describe …
+2026-07-09T14:49:53.452830688Z [inf]  [2026-07-09T14:49:46.116Z] [image-desc#02h] request received mediaType=image/png bytes=202339
+2026-07-09T14:49:53.452836757Z [inf]  [2026-07-09T14:49:46.117Z] [image-desc#02h] model.describe …
+2026-07-09T14:49:53.452843883Z [inf]  [2026-07-09T14:49:50.278Z] [image-desc#02b] model.describe ok ms=28334 textChars=5354
+2026-07-09T14:49:53.452849962Z [inf]  [2026-07-09T14:49:50.948Z] [image-desc#02i] request received mediaType=image/png bytes=189758
+2026-07-09T14:49:53.452856668Z [inf]  [2026-07-09T14:49:50.948Z] [image-desc#02i] model.describe …
+2026-07-09T14:49:53.452863266Z [inf]  [2026-07-09T14:49:52.031Z] [image-desc#02d] model.describe ok ms=27542 textChars=4606
+2026-07-09T14:49:53.452869089Z [inf]  [2026-07-09T14:49:52.715Z] [image-desc#02j] request received mediaType=image/png bytes=214999
+2026-07-09T14:49:53.452875120Z [inf]  [2026-07-09T14:49:52.715Z] [image-desc#02j] model.describe …
+2026-07-09T14:49:53.729585201Z [inf]  [2026-07-09T14:49:53.723Z] [image-desc#028] model.describe ok ms=48873 textChars=7666
+2026-07-09T14:49:54.387724343Z [inf]  [2026-07-09T14:49:54.342Z] [image-desc#02k] model.describe …
+2026-07-09T14:49:54.387908487Z [inf]  [2026-07-09T14:49:54.342Z] [image-desc#02k] request received mediaType=image/png bytes=165704
+2026-07-09T14:50:14.248925087Z [inf]  [2026-07-09T14:50:04.383Z] [image-desc#02e] model.describe ok ms=36778 textChars=4389
+2026-07-09T14:50:14.248929541Z [inf]  [2026-07-09T14:50:04.957Z] [image-desc#02l] request received mediaType=image/png bytes=123735
+2026-07-09T14:50:14.248933813Z [inf]  [2026-07-09T14:50:04.957Z] [image-desc#02l] model.describe …
+2026-07-09T14:50:14.248937834Z [inf]  [2026-07-09T14:50:09.154Z] [image-desc#02c] model.describe ok ms=44586 textChars=5380
+2026-07-09T14:50:14.248941808Z [inf]  [2026-07-09T14:50:09.752Z] [image-desc#02m] request received mediaType=image/png bytes=153240
+2026-07-09T14:50:14.248945587Z [inf]  [2026-07-09T14:50:09.752Z] [image-desc#02m] model.describe …
+2026-07-09T14:50:14.248949481Z [inf]  [2026-07-09T14:50:13.613Z] [image-desc#02f] model.describe ok ms=40124 textChars=5345
+2026-07-09T14:50:14.248953046Z [inf]  [2026-07-09T14:50:14.204Z] [image-desc#02g] model.describe ok ms=28300 textChars=4641
+2026-07-09T14:50:14.318726537Z [inf]  [2026-07-09T14:50:14.315Z] [image-desc#02n] request received mediaType=image/png bytes=386679
+2026-07-09T14:50:14.318735629Z [inf]  [2026-07-09T14:50:14.315Z] [image-desc#02n] model.describe …
+2026-07-09T14:50:14.619924703Z [inf]  [2026-07-09T14:50:14.615Z] [image-desc#02h] model.describe ok ms=28498 textChars=4570
+2026-07-09T14:50:14.808473955Z [inf]  [2026-07-09T14:50:14.805Z] [image-desc#02o] request received mediaType=image/png bytes=156658
+2026-07-09T14:50:14.808480314Z [inf]  [2026-07-09T14:50:14.805Z] [image-desc#02o] model.describe …
+2026-07-09T14:50:15.237098105Z [inf]  [2026-07-09T14:50:15.228Z] [image-desc#02p] request received mediaType=image/png bytes=168607
+2026-07-09T14:50:15.237106054Z [inf]  [2026-07-09T14:50:15.228Z] [image-desc#02p] model.describe …
+2026-07-09T14:50:35.223798062Z [inf]  [2026-07-09T14:50:29.707Z] [image-desc#02k] model.describe ok ms=35365 textChars=3661
+2026-07-09T14:50:35.223804528Z [inf]  [2026-07-09T14:50:29.770Z] [image-desc#02i] model.describe ok ms=38822 textChars=5167
+2026-07-09T14:50:35.223809694Z [inf]  [2026-07-09T14:50:30.383Z] [image-desc#02q] request received mediaType=image/png bytes=313078
+2026-07-09T14:50:35.223813728Z [inf]  [2026-07-09T14:50:30.383Z] [image-desc#02q] model.describe …
+2026-07-09T14:50:35.223817437Z [inf]  [2026-07-09T14:50:30.497Z] [image-desc#02r] request received mediaType=image/png bytes=259528
+2026-07-09T14:50:35.223822651Z [inf]  [2026-07-09T14:50:30.497Z] [image-desc#02r] model.describe …
+2026-07-09T14:50:35.223826548Z [inf]  [2026-07-09T14:50:33.811Z] [image-desc#02l] model.describe ok ms=28854 textChars=4506
+2026-07-09T14:50:35.223830599Z [inf]  [2026-07-09T14:50:34.386Z] [image-desc#02s] request received mediaType=image/png bytes=115241
+2026-07-09T14:50:35.223834439Z [inf]  [2026-07-09T14:50:34.386Z] [image-desc#02s] model.describe …
+2026-07-09T14:50:35.223837948Z [inf]  [2026-07-09T14:50:34.709Z] [image-desc#02j] model.describe ok ms=41994 textChars=6068
+2026-07-09T14:50:35.303589440Z [inf]  [2026-07-09T14:50:35.298Z] [image-desc#02t] request received mediaType=image/png bytes=137620
+2026-07-09T14:50:35.303596811Z [inf]  [2026-07-09T14:50:35.298Z] [image-desc#02t] model.describe …
+2026-07-09T14:50:35.309762911Z [inf]  [2026-07-09T14:50:35.306Z] [image-desc#02m] model.describe ok ms=25554 textChars=4877
+2026-07-09T14:50:35.946737270Z [inf]  [2026-07-09T14:50:35.940Z] [image-desc#02u] request received mediaType=image/png bytes=213781
+2026-07-09T14:50:35.946744840Z [inf]  [2026-07-09T14:50:35.940Z] [image-desc#02u] model.describe …
+2026-07-09T14:50:55.707829938Z [inf]  [2026-07-09T14:50:47.719Z] [image-desc#02o] model.describe ok ms=32914 textChars=4357
+2026-07-09T14:50:55.707835265Z [inf]  [2026-07-09T14:50:47.958Z] [image-desc#02p] model.describe ok ms=32730 textChars=3220
+2026-07-09T14:50:55.707895417Z [inf]  [2026-07-09T14:50:48.370Z] [image-desc#02v] request received mediaType=image/png bytes=274575
+2026-07-09T14:50:55.707901703Z [inf]  [2026-07-09T14:50:48.370Z] [image-desc#02v] model.describe …
+2026-07-09T14:50:55.707908002Z [inf]  [2026-07-09T14:50:48.577Z] [image-desc#02w] request received mediaType=image/png bytes=167657
+2026-07-09T14:50:55.707913448Z [inf]  [2026-07-09T14:50:48.577Z] [image-desc#02w] model.describe …
+2026-07-09T14:50:55.707918476Z [inf]  [2026-07-09T14:50:53.712Z] [image-desc#02n] model.describe ok ms=39397 textChars=5776
+2026-07-09T14:50:55.707923242Z [inf]  [2026-07-09T14:50:54.430Z] [image-desc#02x] request received mediaType=image/png bytes=417688
+2026-07-09T14:50:55.707928236Z [inf]  [2026-07-09T14:50:54.430Z] [image-desc#02x] model.describe …
+2026-07-09T14:50:56.265750501Z [inf]  [2026-07-09T14:50:56.263Z] [image-desc#02q] model.describe ok ms=25880 textChars=5130
+2026-07-09T14:50:57.066411589Z [inf]  [2026-07-09T14:50:56.879Z] [image-desc#02y] request received mediaType=image/png bytes=305547
+2026-07-09T14:50:57.066418417Z [inf]  [2026-07-09T14:50:56.879Z] [image-desc#02y] model.describe …
+2026-07-09T14:50:57.455257100Z [inf]  [2026-07-09T14:50:57.444Z] [image-desc#02r] model.describe ok ms=26947 textChars=5182
+2026-07-09T14:50:58.092354236Z [inf]  [2026-07-09T14:50:58.090Z] [image-desc#02z] request received mediaType=image/png bytes=214509
+2026-07-09T14:50:58.092358258Z [inf]  [2026-07-09T14:50:58.090Z] [image-desc#02z] model.describe …
+2026-07-09T14:51:17.813404341Z [inf]  [2026-07-09T14:51:08.200Z] [image-desc#02s] model.describe ok ms=33814 textChars=5047
+2026-07-09T14:51:17.813413201Z [inf]  [2026-07-09T14:51:08.536Z] [image-desc#02t] model.describe ok ms=33238 textChars=5190
+2026-07-09T14:51:17.813422727Z [inf]  [2026-07-09T14:51:09.091Z] [image-desc#030] request received mediaType=image/png bytes=151331
+2026-07-09T14:51:17.813440675Z [inf]  [2026-07-09T14:51:09.091Z] [image-desc#030] model.describe …
+2026-07-09T14:51:17.813448138Z [inf]  [2026-07-09T14:51:09.233Z] [image-desc#031] request received mediaType=image/png bytes=289465
+2026-07-09T14:51:17.813456446Z [inf]  [2026-07-09T14:51:09.233Z] [image-desc#031] model.describe …
+2026-07-09T14:51:17.813462477Z [inf]  [2026-07-09T14:51:15.095Z] [image-desc#02u] model.describe ok ms=39155 textChars=5265
+2026-07-09T14:51:17.813468486Z [inf]  [2026-07-09T14:51:15.699Z] [image-desc#032] request received mediaType=image/png bytes=156686
+2026-07-09T14:51:17.813475307Z [inf]  [2026-07-09T14:51:15.700Z] [image-desc#032] model.describe …
+2026-07-09T14:51:17.813481451Z [inf]  [2026-07-09T14:51:16.986Z] [image-desc#02v] model.describe ok ms=28616 textChars=5281
+2026-07-09T14:51:17.813488316Z [inf]  [2026-07-09T14:51:17.701Z] [image-desc#033] request received mediaType=image/png bytes=382549
+2026-07-09T14:51:17.813494242Z [inf]  [2026-07-09T14:51:17.701Z] [image-desc#033] model.describe …
+2026-07-09T14:51:20.378341833Z [inf]  [2026-07-09T14:51:20.377Z] [image-desc#02w] model.describe ok ms=31800 textChars=4694
+2026-07-09T14:51:21.242527341Z [inf]  [2026-07-09T14:51:21.188Z] [image-desc#034] request received mediaType=image/png bytes=193567
+2026-07-09T14:51:21.242532027Z [inf]  [2026-07-09T14:51:21.188Z] [image-desc#034] model.describe …
+2026-07-09T14:51:41.008723880Z [inf]  [2026-07-09T14:51:38.020Z] [image-desc#02z] model.describe ok ms=39930 textChars=5574
+2026-07-09T14:51:41.008734412Z [inf]  [2026-07-09T14:51:39.550Z] [image-desc#030] model.describe ok ms=30459 textChars=5137
+2026-07-09T14:51:41.008740329Z [inf]  [2026-07-09T14:51:39.564Z] [image-desc#031] model.describe ok ms=30331 textChars=4172
+2026-07-09T14:51:41.008745542Z [inf]  [2026-07-09T14:51:40.235Z] [image-desc#037] request received mediaType=image/png bytes=362333
+2026-07-09T14:51:41.008751237Z [inf]  [2026-07-09T14:51:40.235Z] [image-desc#037] model.describe …
+2026-07-09T14:51:41.008756244Z [inf]  [2026-07-09T14:51:40.395Z] [image-desc#038] request received mediaType=image/png bytes=175178
+2026-07-09T14:51:41.008762014Z [inf]  [2026-07-09T14:51:40.395Z] [image-desc#038] model.describe …
+2026-07-09T14:51:41.008777677Z [inf]  [2026-07-09T14:51:31.259Z] [image-desc#02y] model.describe ok ms=34380 textChars=5190
+2026-07-09T14:51:41.008784920Z [inf]  [2026-07-09T14:51:32.153Z] [image-desc#035] request received mediaType=image/png bytes=252001
+2026-07-09T14:51:41.008790522Z [inf]  [2026-07-09T14:51:32.153Z] [image-desc#035] model.describe …
+2026-07-09T14:51:41.008795179Z [inf]  [2026-07-09T14:51:35.591Z] [image-desc#02x] model.describe ok ms=41161 textChars=6132
+2026-07-09T14:51:41.008809912Z [inf]  [2026-07-09T14:51:36.178Z] [image-desc#036] request received mediaType=image/png bytes=135338
+2026-07-09T14:51:41.008815749Z [inf]  [2026-07-09T14:51:36.178Z] [image-desc#036] model.describe …
+2026-07-09T14:52:00.992609750Z [inf]  [2026-07-09T14:51:51.880Z] [image-desc#032] model.describe ok ms=36180 textChars=5015
+2026-07-09T14:52:00.992614198Z [inf]  [2026-07-09T14:51:52.536Z] [image-desc#039] request received mediaType=image/png bytes=255444
+2026-07-09T14:52:00.992618214Z [inf]  [2026-07-09T14:51:52.537Z] [image-desc#039] model.describe …
+2026-07-09T14:52:00.992621824Z [inf]  [2026-07-09T14:51:55.645Z] [image-desc#033] model.describe ok ms=37944 textChars=5135
+2026-07-09T14:52:00.992625473Z [inf]  [2026-07-09T14:51:56.574Z] [image-desc#035] model.describe ok ms=24421 textChars=3922
+2026-07-09T14:52:00.992629197Z [err]  [2026-07-09T14:51:58.184Z] [rate-limit] retryable error from provider, backing off before retry attempt=2 maxRetries=6 backoffMs=8734 source=exponential reason=Cannot connect to API: Headers Timeout Error
+2026-07-09T14:52:00.992638138Z [inf]  [2026-07-09T14:51:58.381Z] [image-desc#036] model.describe ok ms=22203 textChars=4521
+2026-07-09T14:52:00.992643324Z [inf]  [2026-07-09T14:52:00.742Z] [image-desc#034] model.describe ok ms=39554 textChars=5249
+2026-07-09T14:52:01.902324732Z [inf]  [2026-07-09T14:52:01.899Z] [image-desc#03b] request received mediaType=image/png bytes=241701
+2026-07-09T14:52:01.902331777Z [inf]  [2026-07-09T14:52:01.899Z] [image-desc#03b] model.describe …
+2026-07-09T14:52:04.010837291Z [inf]  [2026-07-09T14:52:04.006Z] [extract-screen#03a] request received files=27 kinds=image,image,image,image,image,image,image,image,image,image,image,image,image,image,image,image,image,image,image,image,image,image,image,image,image,image,image
+2026-07-09T14:52:04.010840868Z [inf]  [2026-07-09T14:52:04.006Z] [extract-screen#03a] model.extract …
+2026-07-09T14:52:12.207903737Z [inf]  [2026-07-09T14:52:12.201Z] [image-desc#038] model.describe ok ms=31806 textChars=3919
+2026-07-09T14:52:12.790583081Z [inf]  [2026-07-09T14:52:12.789Z] [image-desc#03c] request received mediaType=image/png bytes=142436
+2026-07-09T14:52:12.790589548Z [inf]  [2026-07-09T14:52:12.789Z] [image-desc#03c] model.describe …
+2026-07-09T14:52:14.924510701Z [inf]  [2026-07-09T14:52:14.862Z] [image-desc#037] model.describe ok ms=34627 textChars=5520
+2026-07-09T14:52:15.574100045Z [inf]  [2026-07-09T14:52:15.420Z] [image-desc#03d] request received mediaType=image/png bytes=123103
+2026-07-09T14:52:15.574106218Z [inf]  [2026-07-09T14:52:15.421Z] [image-desc#03d] model.describe …
+2026-07-09T14:52:20.609748624Z [inf]  [2026-07-09T14:52:20.378Z] [image-desc#039] model.describe ok ms=27841 textChars=5457
+2026-07-09T14:52:26.113201171Z [inf]  [2026-07-09T14:52:26.110Z] [image-desc#03b] model.describe ok ms=24211 textChars=4091
+2026-07-09T14:52:32.788548276Z [inf]  [2026-07-09T14:52:32.787Z] [image-desc#03c] model.describe ok ms=19998 textChars=4818
+2026-07-09T14:52:35.288086953Z [inf]  [2026-07-09T14:52:35.281Z] [image-desc#03d] model.describe ok ms=19860 textChars=4016
+2026-07-09T14:52:38.875412979Z [inf]  [2026-07-09T14:52:38.874Z] [extract-screen#03e] request received files=31 kinds=image,image,image,image,image,image,image,image,image,image,image,image,image,image,image,image,image,image,image,image,image,image,image,image,image,image,image,image,image,image,image
+2026-07-09T14:52:38.875418868Z [inf]  [2026-07-09T14:52:38.874Z] [extract-screen#03e] model.extract …
+2026-07-09T14:57:10.531609847Z [err]  [2026-07-09T14:57:08.383Z] [rate-limit] retryable error from provider, backing off before retry attempt=1 maxRetries=6 backoffMs=4516 source=exponential reason=Cannot connect to API: Headers Timeout Error
+2026-07-09T14:57:10.531614697Z [err]  [2026-07-09T14:57:08.384Z] [rate-limit] retryable error from provider, backing off before retry attempt=3 maxRetries=6 backoffMs=16124 source=exponential reason=Cannot connect to API: Headers Timeout Error
+2026-07-09T14:57:40.340700594Z [err]  [2026-07-09T14:57:40.314Z] [rate-limit] retryable error from provider, backing off before retry attempt=1 maxRetries=6 backoffMs=4689 source=exponential reason=Cannot connect to API: Headers Timeout Error
+2026-07-09T15:02:21.981066900Z [inf]  [2026-07-09T15:02:12.187Z] [image-desc#03f] request received mediaType=image/png bytes=186124
+2026-07-09T15:02:21.981071888Z [inf]  [2026-07-09T15:02:12.188Z] [image-desc#03f] model.describe …
+2026-07-09T15:02:21.981076610Z [inf]  [2026-07-09T15:02:12.195Z] [image-desc#03i] request received mediaType=image/png bytes=205879
+2026-07-09T15:02:21.981082000Z [inf]  [2026-07-09T15:02:12.195Z] [image-desc#03i] model.describe …
+2026-07-09T15:02:21.981086173Z [inf]  [2026-07-09T15:02:12.212Z] [image-desc#03h] request received mediaType=image/png bytes=316560
+2026-07-09T15:02:21.981090421Z [inf]  [2026-07-09T15:02:12.212Z] [image-desc#03h] model.describe …
+2026-07-09T15:02:21.981095110Z [inf]  [2026-07-09T15:02:12.305Z] [image-desc#03g] request received mediaType=image/png bytes=458700
+2026-07-09T15:02:21.981099937Z [inf]  [2026-07-09T15:02:12.305Z] [image-desc#03g] model.describe …
+2026-07-09T15:02:26.063373729Z [err]  [2026-07-09T15:02:26.059Z] [rate-limit] retryable error from provider, backing off before retry attempt=2 maxRetries=6 backoffMs=8111 source=exponential reason=Cannot connect to API: Headers Timeout Error
+2026-07-09T15:02:26.108173898Z [err]  [2026-07-09T15:02:26.100Z] [rate-limit] retryable error from provider, backing off before retry attempt=4 maxRetries=6 backoffMs=32967 source=exponential reason=Cannot connect to API: Headers Timeout Error
+2026-07-09T15:02:32.526621507Z [inf]  [2026-07-09T15:02:32.524Z] [image-desc#03f] model.describe ok ms=20336 textChars=4724
+2026-07-09T15:02:33.357988488Z [inf]  [2026-07-09T15:02:33.352Z] [image-desc#03l] request received mediaType=image/png bytes=196699
+2026-07-09T15:02:33.357994001Z [inf]  [2026-07-09T15:02:33.352Z] [image-desc#03l] model.describe …
+2026-07-09T15:02:33.390268032Z [inf]  [2026-07-09T15:02:33.383Z] [image-desc#03m] request received mediaType=image/png bytes=205218
+2026-07-09T15:02:33.390274472Z [inf]  [2026-07-09T15:02:33.383Z] [image-desc#03m] model.describe …
+2026-07-09T15:02:33.473034810Z [inf]  [2026-07-09T15:02:33.464Z] [image-desc#03j] request received mediaType=image/png bytes=395905
+2026-07-09T15:02:33.473040392Z [inf]  [2026-07-09T15:02:33.464Z] [image-desc#03j] model.describe …
+2026-07-09T15:02:33.510404437Z [inf]  [2026-07-09T15:02:33.503Z] [image-desc#03k] request received mediaType=image/png bytes=338163
+2026-07-09T15:02:33.510409942Z [inf]  [2026-07-09T15:02:33.503Z] [image-desc#03k] model.describe …
+2026-07-09T15:02:33.670062685Z [inf]  [2026-07-09T15:02:33.656Z] [image-desc#03n] request received mediaType=image/png bytes=340190
+2026-07-09T15:02:33.670066440Z [inf]  [2026-07-09T15:02:33.656Z] [image-desc#03n] model.describe …
+2026-07-09T15:02:39.051550787Z [inf]  [2026-07-09T15:02:38.801Z] [image-desc#03h] model.describe ok ms=26589 textChars=6516
+2026-07-09T15:02:39.156725626Z [inf]  [2026-07-09T15:02:39.154Z] [image-desc#03i] model.describe ok ms=26959 textChars=6254
+2026-07-09T15:02:46.101049570Z [err]  [2026-07-09T15:02:46.038Z] [rate-limit] retryable error from provider, backing off before retry attempt=2 maxRetries=6 backoffMs=8641 source=exponential reason=Cannot connect to API: Headers Timeout Error
+2026-07-09T15:02:51.370246121Z [inf]  [2026-07-09T15:02:51.367Z] [image-desc#03g] model.describe ok ms=39062 textChars=6362
+2026-07-09T15:03:21.510939353Z [inf]  [2026-07-09T15:03:17.576Z] [image-desc#03m] model.describe ok ms=44193 textChars=4370
+2026-07-09T15:03:21.510945680Z [inf]  [2026-07-09T15:03:18.236Z] [image-desc#03o] request received mediaType=image/png bytes=259899
+2026-07-09T15:03:21.510949994Z [inf]  [2026-07-09T15:03:18.236Z] [image-desc#03o] model.describe …
+2026-07-09T15:03:25.523521889Z [inf]  [2026-07-09T15:03:25.372Z] [image-desc#03n] model.describe ok ms=51716 textChars=5738
+2026-07-09T15:03:26.604147877Z [inf]  [2026-07-09T15:03:26.600Z] [image-desc#03k] model.describe ok ms=53097 textChars=6111
+2026-07-09T15:03:26.774338100Z [inf]  [2026-07-09T15:03:26.770Z] [extract-screen#03p] request received files=5 kinds=image,image,image,image,image
+2026-07-09T15:03:26.774346449Z [inf]  [2026-07-09T15:03:26.770Z] [extract-screen#03p] model.extract …
+2026-07-09T15:03:46.776988464Z [inf]  [2026-07-09T15:03:37.126Z] [image-desc#03l] model.describe ok ms=63774 textChars=4798
+2026-07-09T15:03:46.776995641Z [inf]  [2026-07-09T15:03:46.220Z] [image-desc#03j] model.describe ok ms=72756 textChars=5292
+2026-07-09T15:03:52.895018186Z [inf]  [2026-07-09T15:03:52.889Z] [image-desc#03o] model.describe ok ms=34653 textChars=6501
+2026-07-09T15:03:54.102499117Z [inf]  [2026-07-09T15:03:54.099Z] [extract-screen#03q] request received files=5 kinds=image,image,image,image,image
+2026-07-09T15:03:54.102504462Z [inf]  [2026-07-09T15:03:54.099Z] [extract-screen#03q] model.extract …
+2026-07-09T15:06:14.944273119Z [inf]  [2026-07-09T15:06:13.509Z] [extract-screen#03q] model.extract ok ms=139410 contacts=16 declined=false
+2026-07-09T15:06:14.944278367Z [inf]  [2026-07-09T15:06:13.987Z] [defendant-id#03r] request received files=5 kinds=image,image,image,image,image hasFacts=true contacts=16
+2026-07-09T15:06:14.944283558Z [inf]  [2026-07-09T15:06:13.987Z] [defendant-id#03r] investigation queued jobId=db0862fc-3e11-40bb-a75c-015f1dafba3e
+2026-07-09T15:06:14.944288959Z [inf]  [2026-07-09T15:06:13.987Z] [defendant-id#03r] agent.investigate …
+2026-07-09T15:06:22.255459214Z [inf]  [2026-07-09T15:06:22.242Z] [defendant-tools] web_search … query=American Merchant Group amgboost.com
+2026-07-09T15:06:22.255463650Z [inf]  [2026-07-09T15:06:22.242Z] [defendant-tools] web_search … query="Select Advance Group" merchant cash advance
+2026-07-09T15:06:22.255467164Z [inf]  [2026-07-09T15:06:22.242Z] [defendant-tools] web_search … query="Fast Biz Funds"
+2026-07-09T15:06:22.255470814Z [inf]  [2026-07-09T15:06:22.243Z] [defendant-tools] web_search … query=832-937-3534
+2026-07-09T15:06:28.153089963Z [inf]  [2026-07-09T15:06:28.148Z] [extract-screen#03p] model.extract ok ms=181378 contacts=15 declined=false
+2026-07-09T15:06:28.621299258Z [inf]  [2026-07-09T15:06:28.620Z] [defendant-id#03s] request received files=5 kinds=image,image,image,image,image hasFacts=true contacts=15
+2026-07-09T15:06:28.621308201Z [inf]  [2026-07-09T15:06:28.620Z] [defendant-id#03s] investigation queued jobId=37d8aa49-4670-4e06-90ca-10d03ca0a512
+2026-07-09T15:06:28.623294112Z [inf]  [2026-07-09T15:06:28.620Z] [defendant-id#03s] agent.investigate …
+2026-07-09T15:07:08.625569478Z [inf]  [2026-07-09T15:07:05.225Z] [defendant-tools] web_search ok ms=42983 answerChars=2901 sources=21
+2026-07-09T15:07:08.625579616Z [inf]  [2026-07-09T15:07:06.914Z] [defendant-tools] web_search ok ms=44672 answerChars=2697 sources=24
+2026-07-09T15:07:08.625585528Z [inf]  [2026-07-09T15:07:06.931Z] [defendant-tools] web_search ok ms=44689 answerChars=3279 sources=22
+2026-07-09T15:07:10.420862735Z [inf]  [2026-07-09T15:07:10.412Z] [defendant-tools] web_search … query="612-416-6482"
+2026-07-09T15:07:10.420868787Z [inf]  [2026-07-09T15:07:10.413Z] [defendant-tools] web_search … query="616-947-9604"
+2026-07-09T15:07:10.420874542Z [inf]  [2026-07-09T15:07:10.413Z] [defendant-tools] web_search … query="203-635-8776"
+2026-07-09T15:07:10.420878741Z [inf]  [2026-07-09T15:07:10.414Z] [defendant-tools] web_search … query="508-952-8176"
+2026-07-09T15:07:10.420883761Z [inf]  [2026-07-09T15:07:10.414Z] [defendant-tools] web_search … query="888-991-0338"
+2026-07-09T15:07:40.427474771Z [inf]  [2026-07-09T15:07:38.435Z] [defendant-tools] web_search ok ms=28022 answerChars=1161 sources=28
+2026-07-09T15:07:41.642896772Z [inf]  [2026-07-09T15:07:41.616Z] [defendant-tools] web_search ok ms=31204 answerChars=1712 sources=15
+2026-07-09T15:08:01.615667121Z [inf]  [2026-07-09T15:07:53.394Z] [defendant-tools] web_search ok ms=91151 answerChars=1692 sources=63
+2026-07-09T15:08:01.615672676Z [err]  [2026-07-09T15:08:00.980Z] [rate-limit] retryable error from provider, backing off before retry attempt=5 maxRetries=6 backoffMs=60000 source=exponential reason=Cannot connect to API: Headers Timeout Error
+2026-07-09T15:08:01.615676404Z [err]  [2026-07-09T15:08:00.984Z] [rate-limit] retryable error from provider, backing off before retry attempt=3 maxRetries=6 backoffMs=16583 source=exponential reason=Cannot connect to API: Headers Timeout Error
+2026-07-09T15:08:01.615681251Z [err]  [2026-07-09T15:08:00.984Z] [rate-limit] retryable error from provider, backing off before retry attempt=3 maxRetries=6 backoffMs=16257 source=exponential reason=Cannot connect to API: Headers Timeout Error
+2026-07-09T15:08:06.761642026Z [inf]  [2026-07-09T15:08:06.760Z] [defendant-tools] fetch_page … url=https://amgboost.com/
+2026-07-09T15:08:06.764811706Z [inf]  [2026-07-09T15:08:06.762Z] [defendant-tools] fetch_page … url=https://www.selectadvancegroup.com/
+2026-07-09T15:08:06.764815180Z [inf]  [2026-07-09T15:08:06.763Z] [defendant-tools] fetch_page … url=https://fastbizfundz.com/
+2026-07-09T15:08:06.766393257Z [inf]  [2026-07-09T15:08:06.764Z] [defendant-tools] web_search … query=972-833-0375
+2026-07-09T15:08:06.766399732Z [inf]  [2026-07-09T15:08:06.765Z] [defendant-tools] web_search … query=314-470-1152
+2026-07-09T15:08:06.766404656Z [inf]  [2026-07-09T15:08:06.765Z] [defendant-tools] web_search … query=321-336-3245
+2026-07-09T15:08:06.851360175Z [inf]  [2026-07-09T15:08:06.838Z] [defendant-tools] fetch_page ok ms=75 status=200 textChars=4847
+2026-07-09T15:08:06.924678974Z [inf]  [2026-07-09T15:08:06.905Z] [defendant-tools] fetch_page ok ms=145 status=202 textChars=0
+2026-07-09T15:08:07.468562768Z [inf]  [2026-07-09T15:08:07.421Z] [defendant-tools] fetch_page ok ms=659 status=200 textChars=8000
+2026-07-09T15:08:13.578527448Z [inf]  [2026-07-09T15:08:13.565Z] [defendant-tools] web_search ok ms=63152 answerChars=1047 sources=25
+2026-07-09T15:08:43.801774837Z [inf]  [2026-07-09T15:08:38.246Z] [defendant-tools] web_search ok ms=87832 answerChars=1273 sources=66
+2026-07-09T15:09:43.697446517Z [inf]  [2026-07-09T15:09:42.281Z] [defendant-tools] web_search ok ms=95516 answerChars=1567 sources=47
+2026-07-09T15:10:13.712713019Z [inf]  [2026-07-09T15:10:10.747Z] [defendant-tools] web_search ok ms=123982 answerChars=1338 sources=75
+2026-07-09T15:10:19.694520765Z [inf]  [2026-07-09T15:10:19.683Z] [defendant-tools] web_search ok ms=189269 answerChars=1874 sources=167
+2026-07-09T15:10:24.353622356Z [inf]  [2026-07-09T15:10:24.349Z] [defendant-tools] web_search … query="I can fund your business directly with no credit pulls or broker fees"
+2026-07-09T15:10:24.353630008Z [inf]  [2026-07-09T15:10:24.351Z] [defendant-tools] web_search … query="if I can triple your average monthly income and save your financial future"
+2026-07-09T15:10:24.353641587Z [inf]  [2026-07-09T15:10:24.352Z] [defendant-tools] web_search … query="tossing your file from our system today" funding text
+2026-07-09T15:10:24.353656505Z [inf]  [2026-07-09T15:10:24.352Z] [defendant-tools] web_search … query="Funded merchants only, 1-2 hr approval"
+2026-07-09T15:10:28.050833994Z [inf]  [2026-07-09T15:10:28.046Z] [defendant-tools] web_search ok ms=141281 answerChars=1530 sources=49
+2026-07-09T15:10:36.290315872Z [inf]  [2026-07-09T15:10:36.287Z] [defendant-tools] web_search ok ms=11936 answerChars=1440 sources=9
+2026-07-09T15:11:06.292545658Z [inf]  [2026-07-09T15:11:00.766Z] [defendant-tools] web_search ok ms=36417 answerChars=2512 sources=28
+2026-07-09T15:11:06.292549163Z [inf]  [2026-07-09T15:11:00.783Z] [defendant-tools] web_search ok ms=36431 answerChars=3451 sources=10
+2026-07-09T15:11:08.119773526Z [inf]  [2026-07-09T15:11:07.811Z] [defendant-tools] fetch_page … url=https://amgboost.com/terms
+2026-07-09T15:11:08.119780162Z [inf]  [2026-07-09T15:11:07.813Z] [defendant-tools] fetch_page … url=https://amgboost.com/privacy-policy
+2026-07-09T15:11:08.119786063Z [inf]  [2026-07-09T15:11:07.814Z] [defendant-tools] fetch_page … url=https://www.selectadvancegroup.com/terms
+2026-07-09T15:11:08.119791931Z [inf]  [2026-07-09T15:11:07.814Z] [defendant-tools] fetch_page … url=https://fastbizfundz.com/terms
+2026-07-09T15:11:08.119799050Z [inf]  [2026-07-09T15:11:07.920Z] [defendant-tools] fetch_page ok ms=109 status=202 textChars=0
+2026-07-09T15:11:08.119804668Z [inf]  [2026-07-09T15:11:07.943Z] [defendant-tools] fetch_page ok ms=129 status=404 textChars=1580
+2026-07-09T15:11:08.119810476Z [inf]  [2026-07-09T15:11:07.945Z] [defendant-tools] fetch_page ok ms=132 status=202 textChars=0
+2026-07-09T15:11:08.462494950Z [inf]  [2026-07-09T15:11:08.458Z] [defendant-tools] web_search ok ms=44106 answerChars=2101 sources=46
+2026-07-09T15:11:08.648228847Z [inf]  [2026-07-09T15:11:08.629Z] [defendant-tools] fetch_page ok ms=815 status=404 textChars=416
+2026-07-09T15:11:15.795934398Z [inf]  [2026-07-09T15:11:15.793Z] [defendant-tools] fetch_page … url=https://www.tellows.com/num/6124166482
+2026-07-09T15:11:15.795942069Z [inf]  [2026-07-09T15:11:15.794Z] [defendant-tools] fetch_page … url=https://www.tellows.com/num/6169479604
+2026-07-09T15:11:15.797414972Z [inf]  [2026-07-09T15:11:15.795Z] [defendant-tools] fetch_page … url=https://www.tellows.com/num/2036358776
+2026-07-09T15:11:15.797421228Z [inf]  [2026-07-09T15:11:15.796Z] [defendant-tools] fetch_page … url=https://www.tellows.com/num/5089528176
+2026-07-09T15:11:15.798674624Z [inf]  [2026-07-09T15:11:15.798Z] [defendant-tools] fetch_page … url=https://www.tellows.com/num/8889910338
+2026-07-09T15:11:15.835577121Z [inf]  [2026-07-09T15:11:15.824Z] [defendant-tools] fetch_page ok ms=30 status=403 textChars=16
+2026-07-09T15:11:15.835581110Z [inf]  [2026-07-09T15:11:15.825Z] [defendant-tools] fetch_page ok ms=30 status=403 textChars=16
+2026-07-09T15:11:15.835586216Z [inf]  [2026-07-09T15:11:15.826Z] [defendant-tools] fetch_page ok ms=33 status=403 textChars=16
+2026-07-09T15:11:15.835589783Z [inf]  [2026-07-09T15:11:15.832Z] [defendant-tools] fetch_page ok ms=36 status=403 textChars=16
+2026-07-09T15:11:15.835593899Z [inf]  [2026-07-09T15:11:15.832Z] [defendant-tools] fetch_page ok ms=34 status=403 textChars=16
+2026-07-09T15:11:19.549792105Z [inf]  [2026-07-09T15:11:19.536Z] [defendant-tools] web_search … query=800notes 612-416-6482
+2026-07-09T15:11:19.549798365Z [inf]  [2026-07-09T15:11:19.536Z] [defendant-tools] web_search … query=800notes 888-991-0338 merchant cash advance
+2026-07-09T15:11:19.549805188Z [inf]  [2026-07-09T15:11:19.537Z] [defendant-tools] web_search … query="MADISON" "portfolio is at $100M" text scam
+2026-07-09T15:11:28.787388928Z [inf]  [2026-07-09T15:11:28.785Z] [defendant-tools] fetch_page … url=https://www.selectadvancegroup.com/terms-of-service
+2026-07-09T15:11:28.789166818Z [inf]  [2026-07-09T15:11:28.787Z] [defendant-tools] fetch_page … url=https://www.selectadvancegroup.com/privacy-policy
+2026-07-09T15:11:28.789174723Z [inf]  [2026-07-09T15:11:28.788Z] [defendant-tools] fetch_page … url=https://fastbizfundz.com/privacy-policy
+2026-07-09T15:11:28.790678315Z [inf]  [2026-07-09T15:11:28.789Z] [defendant-tools] fetch_page … url=https://fastbizfundz.com/about-us
+2026-07-09T15:11:28.820267305Z [inf]  [2026-07-09T15:11:28.814Z] [defendant-tools] fetch_page ok ms=25 status=200 redirected=https://fastbizfundz.com/about-us/ textChars=3825
+2026-07-09T15:11:28.840290871Z [inf]  [2026-07-09T15:11:28.837Z] [defendant-tools] fetch_page ok ms=50 status=200 textChars=8000
+2026-07-09T15:11:28.840297097Z [inf]  [2026-07-09T15:11:28.839Z] [defendant-tools] fetch_page ok ms=54 status=200 textChars=8000
+2026-07-09T15:11:29.753398898Z [inf]  [2026-07-09T15:11:29.740Z] [defendant-tools] fetch_page ok ms=952 status=404 textChars=416
+2026-07-09T15:12:19.849261574Z [inf]  [2026-07-09T15:12:12.460Z] [defendant-tools] web_search ok ms=52924 answerChars=1595 sources=55
+2026-07-09T15:12:19.849266442Z [inf]  [2026-07-09T15:12:17.824Z] [defendant-tools] fetch_page … url=https://amgboost.com
+2026-07-09T15:12:19.849270638Z [inf]  [2026-07-09T15:12:17.826Z] [defendant-tools] sos_lookup … entity_name=Select Advance Group LLC state=NY
+2026-07-09T15:12:19.849274359Z [inf]  [2026-07-09T15:12:17.826Z] [defendant-tools] sos_lookup … entity_name=Select Advance Group LLC state=DE
+2026-07-09T15:12:19.849277842Z [inf]  [2026-07-09T15:12:17.955Z] [defendant-tools] fetch_page ok ms=131 status=202 redirected=https://amgboost.com/ textChars=0
+2026-07-09T15:12:39.854698726Z [inf]  [2026-07-09T15:12:33.260Z] [defendant-tools] web_search ok ms=73724 answerChars=2057 sources=108
+2026-07-09T15:12:59.573599926Z [inf]  [2026-07-09T15:12:54.244Z] [defendant-tools] web_search ok ms=94707 answerChars=2541 sources=47
+2026-07-09T15:13:19.579925522Z [inf]  [2026-07-09T15:13:15.471Z] [defendant-id#03s] agent.investigate ok ms=406851 steps=5 reportChars=4419
+2026-07-09T15:13:19.579933459Z [inf]  [2026-07-09T15:13:15.471Z] [defendant-id#03s] agent.format …
+2026-07-09T15:13:21.074605358Z [inf]  [2026-07-09T15:13:21.042Z] [defendant-id#03s] agent.format ok ms=5571 candidates=0 companies=(none)
+2026-07-09T15:13:21.074608727Z [inf]  [2026-07-09T15:13:21.043Z] [defendant-id#03s] companies scored companies=0 bands=
+2026-07-09T15:13:21.074614450Z [inf]  [2026-07-09T15:13:21.043Z] [defendant-id#03s] sos lookups summarized attempts=0 flCrossLookups=0 found=0 attached=0 synthesized=0 errors=0
+2026-07-09T15:14:10.791693380Z [err]  [2026-07-09T15:14:02.593Z] [rate-limit] retryable error from provider, backing off before retry attempt=4 maxRetries=6 backoffMs=32308 source=exponential reason=Cannot connect to API: Headers Timeout Error
+2026-07-09T15:14:10.791698410Z [err]  [2026-07-09T15:14:02.594Z] [rate-limit] retryable error from provider, backing off before retry attempt=6 maxRetries=6 backoffMs=60000 source=exponential reason=Cannot connect to API: Headers Timeout Error
+2026-07-09T15:14:10.791703495Z [err]  [2026-07-09T15:14:02.600Z] [rate-limit] retryable error from provider, backing off before retry attempt=4 maxRetries=6 backoffMs=32673 source=exponential reason=Cannot connect to API: Headers Timeout Error
+2026-07-09T15:14:30.791011355Z [inf]  [2026-07-09T15:14:22.158Z] [defendant-tools] sos_lookup ok ms=124332 result=not_found
+2026-07-09T15:15:10.814855959Z [inf]  [2026-07-09T15:15:03.555Z] [defendant-tools] sos_lookup ok ms=165729 result=not_found
+2026-07-09T15:15:10.814861351Z [inf]  [2026-07-09T15:15:09.738Z] [defendant-tools] web_search … query="Select Advance Group" LLC "secretary of state" OR "registered agent"
+2026-07-09T15:15:10.814865888Z [inf]  [2026-07-09T15:15:09.739Z] [defendant-tools] web_search … query="American Merchant Group" LLC "secretary of state" OR "registered agent" amgboost
+2026-07-09T15:15:10.814869433Z [inf]  [2026-07-09T15:15:09.739Z] [defendant-tools] sos_lookup … entity_name=Select Advance Group state=FL
+2026-07-09T15:15:10.814873180Z [inf]  [2026-07-09T15:15:09.740Z] [defendant-tools] sos_lookup … entity_name=Select Advance Group state=NJ
+2026-07-09T15:16:00.648204213Z [inf]  [2026-07-09T15:15:58.341Z] [defendant-tools] sos_lookup ok ms=48601 result=not_found
+2026-07-09T15:16:30.668959506Z [inf]  [2026-07-09T15:16:25.490Z] [defendant-tools] web_search ok ms=75751 answerChars=2230 sources=93
+2026-07-09T15:18:21.379466714Z [inf]  [2026-07-09T15:18:15.126Z] [defendant-tools] sos_lookup ok ms=185387 result=found entity=SELECT ADVISOR GROUP, LLC
+2026-07-09T15:20:11.315133198Z [err]  [2026-07-09T15:20:04.237Z] [rate-limit] retryable error from provider, backing off before retry attempt=5 maxRetries=6 backoffMs=60000 source=exponential reason=Cannot connect to API: Headers Timeout Error
+2026-07-09T15:20:11.315137727Z [err]  [2026-07-09T15:20:04.238Z] [rate-limit] giving up after exhausting retries attempts=7 reason=Cannot connect to API: Headers Timeout Error
+2026-07-09T15:20:11.315142080Z [err]  [2026-07-09T15:20:04.238Z] [extract-screen#01q] failed: model threw message=Cannot connect to API: Headers Timeout Error name=AI_APICallError
+2026-07-09T15:20:11.315152699Z [err]  [2026-07-09T15:20:04.240Z] [rate-limit] retryable error from provider, backing off before retry attempt=5 maxRetries=6 backoffMs=60000 source=exponential reason=Cannot connect to API: Headers Timeout Error
+2026-07-09T15:20:11.315158991Z [err]  [2026-07-09T15:20:10.229Z] [rate-limit] retryable error from provider, backing off before retry attempt=1 maxRetries=6 backoffMs=4299 source=exponential reason=Cannot connect to API: Headers Timeout Error
+2026-07-09T15:21:11.159694918Z [inf]  [2026-07-09T15:21:01.464Z] [image-desc#03t] request received mediaType=image/png bytes=237311
+2026-07-09T15:21:11.159701826Z [inf]  [2026-07-09T15:21:01.465Z] [image-desc#03t] model.describe …
+2026-07-09T15:21:11.159707613Z [inf]  [2026-07-09T15:21:01.592Z] [image-desc#03w] request received mediaType=image/png bytes=214554
+2026-07-09T15:21:11.159712268Z [inf]  [2026-07-09T15:21:01.592Z] [image-desc#03w] model.describe …
+2026-07-09T15:21:11.159717409Z [inf]  [2026-07-09T15:21:01.710Z] [image-desc#03v] request received mediaType=image/png bytes=411655
+2026-07-09T15:21:11.159722811Z [inf]  [2026-07-09T15:21:01.710Z] [image-desc#03v] model.describe …
+2026-07-09T15:21:11.159728110Z [inf]  [2026-07-09T15:21:01.725Z] [image-desc#03u] request received mediaType=image/png bytes=425065
+2026-07-09T15:21:11.159734388Z [inf]  [2026-07-09T15:21:01.725Z] [image-desc#03u] model.describe …
+2026-07-09T15:21:31.175082235Z [inf]  [2026-07-09T15:21:24.864Z] [image-desc#03w] model.describe ok ms=23272 textChars=4897
+2026-07-09T15:21:31.175086961Z [inf]  [2026-07-09T15:21:25.485Z] [image-desc#03x] request received mediaType=image/png bytes=189758
+2026-07-09T15:21:31.175092358Z [inf]  [2026-07-09T15:21:25.486Z] [image-desc#03x] model.describe …
+2026-07-09T15:21:31.175097076Z [inf]  [2026-07-09T15:21:26.045Z] [image-desc#03t] model.describe ok ms=24580 textChars=5055
+2026-07-09T15:21:31.175102328Z [inf]  [2026-07-09T15:21:29.223Z] [image-desc#03u] model.describe ok ms=27498 textChars=5938
+2026-07-09T15:21:51.175533227Z [inf]  [2026-07-09T15:21:44.848Z] [defendant-tools] web_search ok ms=395110 answerChars=2041 sources=43
+2026-07-09T15:21:51.175539878Z [inf]  [2026-07-09T15:21:46.681Z] [image-desc#03x] model.describe ok ms=21195 textChars=4817
+2026-07-09T15:21:51.175543698Z [inf]  [2026-07-09T15:21:47.995Z] [image-desc#03v] model.describe ok ms=46285 textChars=5726
+2026-07-09T15:21:51.175547209Z [inf]  [2026-07-09T15:21:49.068Z] [extract-screen#03y] request received files=5 kinds=image,image,image,image,image
+2026-07-09T15:21:51.175551179Z [inf]  [2026-07-09T15:21:49.068Z] [extract-screen#03y] model.extract …
+2026-07-09T15:21:51.175554612Z [inf]  [2026-07-09T15:21:49.492Z] [defendant-tools] sos_lookup … entity_name=Select Advance Group state=NY
+2026-07-09T15:21:51.175558195Z [inf]  [2026-07-09T15:21:49.493Z] [defendant-tools] sos_lookup … entity_name=Select Advance Group state=TX
+2026-07-09T15:21:51.175562314Z [inf]  [2026-07-09T15:21:49.493Z] [defendant-tools] sos_lookup … entity_name=American Merchant Group state=TX
+2026-07-09T15:21:51.175565673Z [inf]  [2026-07-09T15:21:49.494Z] [defendant-tools] sos_lookup … entity_name=American Merchant Group LLC state=FL
+2026-07-09T15:23:00.946345230Z [inf]  [2026-07-09T15:22:51.410Z] [defendant-tools] sos_lookup ok ms=61917 result=found entity=AMERICAN MERCHANT GROUP, LLC
+2026-07-09T15:23:00.946355792Z [inf]  [2026-07-09T15:22:51.525Z] [defendant-tools] sos_lookup ok ms=62032 result=not_found
+2026-07-09T15:23:08.718725716Z [inf]  [2026-07-09T15:23:08.577Z] [defendant-tools] sos_lookup ok ms=79085 result=not_found
+2026-07-09T15:23:58.585742423Z [inf]  [2026-07-09T15:23:57.471Z] [extract-screen#03y] model.extract ok ms=128402 contacts=16 declined=false
+2026-07-09T15:23:58.585746626Z [inf]  [2026-07-09T15:23:57.907Z] [defendant-id#03z] request received files=5 kinds=image,image,image,image,image hasFacts=true contacts=16
+2026-07-09T15:23:58.585750865Z [inf]  [2026-07-09T15:23:57.907Z] [defendant-id#03z] investigation queued jobId=266c3e64-e752-4e84-911e-f0398dfedb4a
+2026-07-09T15:23:58.585754615Z [inf]  [2026-07-09T15:23:57.907Z] [defendant-id#03z] agent.investigate …
+2026-07-09T15:24:03.882689271Z [inf]  [2026-07-09T15:24:03.881Z] [defendant-tools] web_search … query="516-962-3496"
+2026-07-09T15:24:03.882699987Z [inf]  [2026-07-09T15:24:03.881Z] [defendant-tools] web_search … query="929-241-2425"
+2026-07-09T15:24:03.882706549Z [inf]  [2026-07-09T15:24:03.881Z] [defendant-tools] web_search … query="541-638-9395"
+2026-07-09T15:24:03.884105433Z [inf]  [2026-07-09T15:24:03.882Z] [defendant-tools] web_search … query="772-783-1574"
+2026-07-09T15:24:03.884109935Z [inf]  [2026-07-09T15:24:03.882Z] [defendant-tools] web_search … query="234-601-8366"
+2026-07-09T15:24:33.857935994Z [inf]  [2026-07-09T15:24:26.503Z] [defendant-tools] web_search ok ms=22622 answerChars=814 sources=10
+2026-07-09T15:24:33.857943088Z [inf]  [2026-07-09T15:24:27.176Z] [defendant-tools] web_search ok ms=23295 answerChars=1077 sources=20
+2026-07-09T15:24:33.857948224Z [inf]  [2026-07-09T15:24:29.434Z] [defendant-tools] web_search ok ms=25553 answerChars=1232 sources=14
+2026-07-09T15:25:13.871651519Z [inf]  [2026-07-09T15:25:04.634Z] [defendant-tools] web_search ok ms=60752 answerChars=1271 sources=33
+2026-07-09T15:25:13.871655199Z [inf]  [2026-07-09T15:25:08.478Z] [defendant-tools] web_search ok ms=64596 answerChars=1305 sources=65
+2026-07-09T15:25:14.842100093Z [inf]  [2026-07-09T15:25:14.630Z] [defendant-tools] web_search … query="this is ryan from turbo" funding text
+2026-07-09T15:25:14.842104655Z [inf]  [2026-07-09T15:25:14.630Z] [defendant-tools] web_search … query="Eric with Turbo" funding text message
+2026-07-09T15:25:14.842108722Z [inf]  [2026-07-09T15:25:14.630Z] [defendant-tools] web_search … query="Robert from Venture" business funding text scam
+2026-07-09T15:25:14.842112657Z [inf]  [2026-07-09T15:25:14.630Z] [defendant-tools] web_search … query="Head Senior Underwriter" "Funding group" text scam
+2026-07-09T15:25:14.842117018Z [inf]  [2026-07-09T15:25:14.630Z] [defendant-tools] web_search … query="Its Sal" loan payments lowered to zero text scam
+2026-07-09T15:25:22.576503555Z [inf]  [2026-07-09T15:25:22.546Z] [defendant-tools] sos_lookup ok ms=213052 result=not_found
+2026-07-09T15:26:02.576200693Z [inf]  [2026-07-09T15:25:56.029Z] [defendant-tools] web_search ok ms=41399 answerChars=3320 sources=13
+2026-07-09T15:26:05.464440294Z [err]  [2026-07-09T15:26:05.456Z] [rate-limit] retryable error from provider, backing off before retry attempt=6 maxRetries=6 backoffMs=60000 source=exponential reason=Cannot connect to API: Headers Timeout Error
+2026-07-09T15:26:05.464444504Z [err]  [2026-07-09T15:26:05.460Z] [rate-limit] retryable error from provider, backing off before retry attempt=6 maxRetries=6 backoffMs=60000 source=exponential reason=Cannot connect to API: Headers Timeout Error
+2026-07-09T15:26:11.312606688Z [inf]  [2026-07-09T15:26:11.280Z] [defendant-tools] sos_lookup … entity_name=Select Advance Group LLC state=CA
+2026-07-09T15:26:11.312614120Z [inf]  [2026-07-09T15:26:11.280Z] [defendant-tools] sos_lookup … entity_name=Select Advance Group LLC state=NV
+2026-07-09T15:26:11.312620715Z [inf]  [2026-07-09T15:26:11.282Z] [defendant-tools] sos_lookup … entity_name=Select Advance Group LLC state=WY
+2026-07-09T15:26:11.312627714Z [inf]  [2026-07-09T15:26:11.282Z] [defendant-tools] sos_lookup … entity_name=Select Advance Group LLC state=CO
+2026-07-09T15:26:11.312635424Z [inf]  [2026-07-09T15:26:11.282Z] [defendant-tools] web_search … query="American Merchant Group" employees linkedin
+2026-07-09T15:26:11.312642478Z [inf]  [2026-07-09T15:26:11.283Z] [defendant-tools] web_search … query=selectadvancegroup.com whois OR "select advance group" address Brooklyn
+2026-07-09T15:26:31.052046972Z [inf]  [2026-07-09T15:26:24.690Z] [defendant-tools] web_search ok ms=70060 answerChars=1807 sources=88
+2026-07-09T15:26:51.043057471Z [inf]  [2026-07-09T15:26:41.605Z] [defendant-tools] web_search ok ms=86975 answerChars=2681 sources=88
+2026-07-09T15:26:56.690002167Z [inf]  [2026-07-09T15:26:56.408Z] [defendant-tools] web_search ok ms=101778 answerChars=2854 sources=31
+2026-07-09T15:27:26.466305505Z [inf]  [2026-07-09T15:27:19.624Z] [defendant-tools] sos_lookup ok ms=68344 result=not_found
+2026-07-09T15:27:26.466309727Z [inf]  [2026-07-09T15:27:20.487Z] [defendant-tools] web_search ok ms=125857 answerChars=3874 sources=102
+2026-07-09T15:27:28.874736424Z [inf]  [2026-07-09T15:27:28.644Z] [defendant-tools] fetch_page … url=https://turbofunding.com/about
+2026-07-09T15:27:28.874741256Z [inf]  [2026-07-09T15:27:28.646Z] [defendant-tools] fetch_page … url=https://turbofunding.com/privacy
+2026-07-09T15:27:28.874745960Z [inf]  [2026-07-09T15:27:28.704Z] [defendant-tools] fetch_page ok ms=60 status=200 textChars=3825
+2026-07-09T15:27:28.874750486Z [inf]  [2026-07-09T15:27:28.752Z] [defendant-tools] fetch_page ok ms=106 status=200 textChars=8000
+2026-07-09T15:27:35.089052910Z [inf]  [2026-07-09T15:27:35.086Z] [defendant-tools] fetch_page … url=https://turbofunding.com/terms
+2026-07-09T15:27:35.089061750Z [inf]  [2026-07-09T15:27:35.088Z] [defendant-tools] sos_lookup … entity_name=TurboFunding, LLC state=NY
+2026-07-09T15:27:35.090446954Z [inf]  [2026-07-09T15:27:35.088Z] [defendant-tools] sos_lookup … entity_name=TurboFunding, LLC state=DE
+2026-07-09T15:27:35.158724952Z [inf]  [2026-07-09T15:27:35.142Z] [defendant-tools] fetch_page ok ms=56 status=200 textChars=8000
+2026-07-09T15:27:37.625706301Z [inf]  [2026-07-09T15:27:37.561Z] [defendant-tools] web_search ok ms=86278 answerChars=2732 sources=25
+2026-07-09T15:28:07.619309242Z [inf]  [2026-07-09T15:28:04.534Z] [defendant-tools] sos_lookup ok ms=113252 result=not_found
+2026-07-09T15:28:07.619315852Z [inf]  [2026-07-09T15:28:06.394Z] [defendant-tools] web_search ok ms=115112 answerChars=2851 sources=54
+2026-07-09T15:28:27.613770446Z [inf]  [2026-07-09T15:28:18.933Z] [defendant-tools] sos_lookup ok ms=127651 result=not_found
+2026-07-09T15:29:17.899730769Z [inf]  [2026-07-09T15:29:11.673Z] [defendant-tools] sos_lookup ok ms=96585 result=found entity=TURBOFUNDING LLC
+2026-07-09T15:29:57.639624959Z [inf]  [2026-07-09T15:29:49.174Z] [defendant-tools] sos_lookup ok ms=217894 result=not_found
+2026-07-09T15:29:57.639632043Z [inf]  [2026-07-09T15:29:55.867Z] [defendant-tools] sos_lookup … entity_name=Select Advance Group LLC state=NJ
+2026-07-09T15:29:57.639644281Z [inf]  [2026-07-09T15:29:55.868Z] [defendant-tools] sos_lookup … entity_name=Select Advance Group LLC state=GA
+2026-07-09T15:29:57.639648307Z [inf]  [2026-07-09T15:29:55.868Z] [defendant-tools] sos_lookup … entity_name=Select Advance Group LLC state=IL
+2026-07-09T15:29:57.639652102Z [inf]  [2026-07-09T15:29:55.869Z] [defendant-tools] sos_lookup … entity_name=Select Advance Group LLC state=CT
+2026-07-09T15:30:37.746671886Z [inf]  [2026-07-09T15:30:37.508Z] [defendant-tools] sos_lookup ok ms=41640 result=not_found
+2026-07-09T15:31:37.560097184Z [inf]  [2026-07-09T15:31:34.746Z] [defendant-tools] sos_lookup ok ms=239658 result=not_found
+2026-07-09T15:31:41.262872058Z [inf]  [2026-07-09T15:31:41.260Z] [defendant-tools] web_search … query="Venture" business funding company "no credit needed" text message lead generation
+2026-07-09T15:31:41.262878602Z [inf]  [2026-07-09T15:31:41.260Z] [defendant-tools] web_search … query="Funding Group" Max Garcia underwriter business funding
+2026-07-09T15:31:47.470339743Z [inf]  [2026-07-09T15:31:47.469Z] [defendant-tools] sos_lookup ok ms=111600 result=not_found
+2026-07-09T15:31:56.845816397Z [inf]  [2026-07-09T15:31:56.825Z] [defendant-tools] sos_lookup ok ms=120958 result=not_found
+2026-07-09T15:32:02.560643315Z [inf]  [2026-07-09T15:32:02.532Z] [defendant-tools] web_search ok ms=21272 answerChars=953 sources=22
+2026-07-09T15:32:06.682115597Z [err]  [2026-07-09T15:32:06.680Z] [rate-limit] giving up after exhausting retries attempts=7 reason=Cannot connect to API: Headers Timeout Error
+2026-07-09T15:32:06.682120211Z [err]  [2026-07-09T15:32:06.680Z] [extract-screen#03e] failed: model threw message=Cannot connect to API: Headers Timeout Error name=AI_APICallError
+2026-07-09T15:32:06.683501812Z [err]  [2026-07-09T15:32:06.681Z] [rate-limit] giving up after exhausting retries attempts=7 reason=Cannot connect to API: Headers Timeout Error
+2026-07-09T15:32:06.683507548Z [err]  [2026-07-09T15:32:06.681Z] [extract-screen#03a] failed: model threw message=Cannot connect to API: Headers Timeout Error name=AI_APICallError
+2026-07-09T15:32:12.475354010Z [inf]  [2026-07-09T15:32:12.474Z] [defendant-tools] sos_lookup ok ms=136606 result=not_found
+2026-07-09T15:32:19.712012182Z [inf]  [2026-07-09T15:32:19.704Z] [defendant-tools] web_search … query="Fast Biz Funds" text message spam "Elli"
+2026-07-09T15:32:19.712016779Z [inf]  [2026-07-09T15:32:19.704Z] [defendant-tools] fetch_page … url=https://www.fastbizfunding.com/
+2026-07-09T15:32:24.459286320Z [inf]  [2026-07-09T15:32:24.362Z] [defendant-tools] fetch_page ok ms=4658 status=200 textChars=5544
+2026-07-09T15:32:54.275433274Z [inf]  [2026-07-09T15:32:51.866Z] [defendant-tools] web_search ok ms=70606 answerChars=4083 sources=36
+2026-07-09T15:32:54.813170133Z [inf]  [2026-07-09T15:32:54.626Z] [defendant-tools] web_search … query="Royal Funding Group" website business funding NYC
+2026-07-09T15:32:54.813174786Z [inf]  [2026-07-09T15:32:54.627Z] [defendant-tools] web_search … query=Max Garcia "Royal Funding Group" linkedin
+2026-07-09T15:33:24.631214873Z [inf]  [2026-07-09T15:33:23.456Z] [defendant-tools] web_search ok ms=28830 answerChars=2377 sources=10
+2026-07-09T15:33:25.015530651Z [inf]  [2026-07-09T15:33:24.742Z] [defendant-tools] web_search ok ms=30115 answerChars=1705 sources=11
+2026-07-09T15:33:27.343520032Z [inf]  [2026-07-09T15:33:27.324Z] [defendant-tools] fetch_page … url=https://royalfundinggroup.com/about-us/
+2026-07-09T15:33:27.343525845Z [inf]  [2026-07-09T15:33:27.326Z] [defendant-tools] web_search … query="Royal Funding Group" terms of service privacy policy LLC OR Inc
+2026-07-09T15:33:27.456849135Z [inf]  [2026-07-09T15:33:27.455Z] [defendant-tools] fetch_page ok ms=131 status=200 textChars=1625
+2026-07-09T15:34:17.479329572Z [inf]  [2026-07-09T15:34:14.169Z] [defendant-tools] web_search ok ms=114465 answerChars=3720 sources=99
+2026-07-09T15:34:22.646255100Z [inf]  [2026-07-09T15:34:22.643Z] [defendant-tools] web_search … query="American Merchant Group" revenue OR "employees" Flower Mound Texas
+2026-07-09T15:34:22.646261521Z [inf]  [2026-07-09T15:34:22.643Z] [defendant-tools] web_search … query="amgboost.com" OR "amgmca.com" terms of service "Texas" LLC
+2026-07-09T15:35:32.916799708Z [inf]  [2026-07-09T15:35:24.526Z] [defendant-tools] web_search ok ms=117200 answerChars=3150 sources=19
+2026-07-09T15:35:32.916803807Z [inf]  [2026-07-09T15:35:27.516Z] [defendant-tools] sos_lookup … entity_name=Royal Funding Group Inc state=NY
+2026-07-09T15:35:32.916809456Z [inf]  [2026-07-09T15:35:27.516Z] [defendant-tools] sos_lookup … entity_name=Royal Funding Group LLC state=NY
+2026-07-09T15:35:32.916814205Z [inf]  [2026-07-09T15:35:27.517Z] [defendant-tools] sos_lookup … entity_name=Royal Funding Group state=NY
+2026-07-09T15:36:02.700142379Z [inf]  [2026-07-09T15:36:01.386Z] [defendant-tools] web_search ok ms=98743 answerChars=2089 sources=73
+2026-07-09T15:36:03.567676054Z [inf]  [2026-07-09T15:36:03.565Z] [defendant-tools] web_search ok ms=100922 answerChars=1726 sources=87
+2026-07-09T15:36:08.832309283Z [inf]  [2026-07-09T15:36:08.826Z] [defendant-tools] fetch_page … url=https://amgmca.com/terms-conditions/
+2026-07-09T15:36:08.832317185Z [inf]  [2026-07-09T15:36:08.828Z] [defendant-tools] sos_lookup … entity_name=GJD Stars Inc state=FL
+2026-07-09T15:36:09.148037454Z [inf]  [2026-07-09T15:36:08.922Z] [defendant-tools] fetch_page ok ms=96 status=200 textChars=8000
+2026-07-09T15:36:48.950586784Z [inf]  [2026-07-09T15:36:43.475Z] [defendant-tools] sos_lookup ok ms=75959 result=found entity=ROYAL FUNDING GROUP INC.
+2026-07-09T15:36:48.950594535Z [inf]  [2026-07-09T15:36:45.934Z] [defendant-tools] sos_lookup ok ms=78417 result=found entity=ROYAL FUNDING GROUP INC.
+2026-07-09T15:37:18.935133868Z [inf]  [2026-07-09T15:37:17.672Z] [defendant-tools] sos_lookup ok ms=110156 result=found entity=ROYAL FUNDING GROUP INC.
+2026-07-09T15:37:23.363210367Z [inf]  [2026-07-09T15:37:23.360Z] [defendant-tools] sos_lookup … entity_name=Royal Funding Group LLC state=DE
+2026-07-09T15:37:23.363219403Z [inf]  [2026-07-09T15:37:23.361Z] [defendant-tools] sos_lookup … entity_name=Royal Funding Group state=NJ
+2026-07-09T15:37:53.420302851Z [inf]  [2026-07-09T15:37:46.868Z] [defendant-tools] sos_lookup ok ms=23507 result=not_found
+2026-07-09T15:37:53.420307787Z [inf]  [2026-07-09T15:37:47.513Z] [defendant-tools] sos_lookup ok ms=98685 result=found entity=GJD STARS INC.
+2026-07-09T15:37:53.420312300Z [inf]  [2026-07-09T15:37:52.784Z] [defendant-tools] fetch_page … url=https://amgmca.com/privacy-policy
+2026-07-09T15:37:53.420316920Z [inf]  [2026-07-09T15:37:53.107Z] [defendant-tools] fetch_page ok ms=323 status=200 redirected=https://amgmca.com/privacy-policy-2/ textChars=8000
+2026-07-09T15:38:13.414195359Z [inf]  [2026-07-09T15:38:11.886Z] [defendant-tools] web_search … query="GJD Stars" OR AMGMCA employees linkedin revenue
+2026-07-09T15:38:53.502460119Z [inf]  [2026-07-09T15:38:52.758Z] [defendant-tools] web_search ok ms=40872 answerChars=2655 sources=45
+2026-07-09T15:38:53.502463674Z [inf]  [2026-07-09T15:38:53.297Z] [defendant-tools] sos_lookup ok ms=89937 result=not_found
+2026-07-09T15:38:56.826526774Z [inf]  [2026-07-09T15:38:56.825Z] [defendant-tools] fetch_page … url=https://royalfundinggroup.com/terms-conditions/
+2026-07-09T15:38:56.827804171Z [inf]  [2026-07-09T15:38:56.826Z] [defendant-tools] fetch_page … url=https://royalfundinggroup.com/privacy-policy/
+2026-07-09T15:38:56.940362041Z [inf]  [2026-07-09T15:38:56.939Z] [defendant-tools] fetch_page ok ms=113 status=200 textChars=3669
+2026-07-09T15:38:56.952745080Z [inf]  [2026-07-09T15:38:56.945Z] [defendant-tools] fetch_page ok ms=120 status=200 textChars=4355
+2026-07-09T15:39:00.577443934Z [inf]  [2026-07-09T15:39:00.453Z] [defendant-tools] sos_lookup … entity_name=RFG USA INC state=NY
+2026-07-09T15:39:00.577447721Z [inf]  [2026-07-09T15:39:00.453Z] [defendant-tools] sos_lookup … entity_name=RFG USA INC state=DE
+2026-07-09T15:39:06.756238701Z [inf]  [2026-07-09T15:39:06.676Z] [defendant-tools] sos_lookup ok ms=6223 result=found entity=RFG USA INC
+2026-07-09T15:39:56.670665014Z [inf]  [2026-07-09T15:39:56.146Z] [defendant-id#03r] agent.investigate ok ms=2022159 steps=15 reportChars=11615
+2026-07-09T15:39:56.670669717Z [inf]  [2026-07-09T15:39:56.146Z] [defendant-id#03r] agent.format …
+2026-07-09T15:40:16.676435641Z [inf]  [2026-07-09T15:40:14.560Z] [defendant-id#03r] agent.format ok ms=18414 candidates=3 companies=American Merchant Group (AMG/AMGMCA) | Select Advance Group | Fast Biz Funds (aka FB Funds)
+2026-07-09T15:40:16.676439737Z [inf]  [2026-07-09T15:40:14.565Z] [defendant-id#03r] companies scored companies=3 bands=pass | pass | pass
+2026-07-09T15:40:16.676443363Z [inf]  [2026-07-09T15:40:14.565Z] [defendant-id#03r] sos lookups summarized attempts=17 flCrossLookups=0 found=2 attached=2 synthesized=0 errors=0
+2026-07-09T15:40:46.684615929Z [inf]  [2026-07-09T15:40:38.305Z] [defendant-tools] sos_lookup ok ms=97852 result=found entity=RFG USA HOLDINGS, LLC
+2026-07-09T15:40:48.698739672Z [inf]  [2026-07-09T15:40:48.536Z] [defendant-tools] web_search … query="Royal Funding Group" employees linkedin revenue
+2026-07-09T15:40:48.698745342Z [inf]  [2026-07-09T15:40:48.537Z] [defendant-tools] web_search … query="TurboFunding" employees linkedin revenue
+2026-07-09T15:41:18.490291214Z [inf]  [2026-07-09T15:41:14.799Z] [defendant-tools] web_search ok ms=26263 answerChars=2637 sources=10
+2026-07-09T15:41:58.542034172Z [inf]  [2026-07-09T15:41:55.807Z] [defendant-tools] web_search ok ms=67270 answerChars=1863 sources=59
+2026-07-09T15:42:38.292438498Z [inf]  [2026-07-09T15:42:32.975Z] [defendant-id#03z] agent.investigate ok ms=1115068 steps=13 reportChars=7738
+2026-07-09T15:42:38.292446554Z [inf]  [2026-07-09T15:42:32.976Z] [defendant-id#03z] agent.format …
+2026-07-09T15:42:45.291938588Z [inf]  [2026-07-09T15:42:45.288Z] [defendant-id#03z] agent.format ok ms=12312 candidates=2 companies=Royal Funding Group | TurboFunding
+2026-07-09T15:42:45.291943977Z [inf]  [2026-07-09T15:42:45.288Z] [defendant-tools] sos_lookup … entity_name=TURBOFUNDING LLC state=FL
+2026-07-09T15:42:45.291948605Z [inf]  [2026-07-09T15:42:45.289Z] [defendant-tools] sos_lookup … entity_name=ROYAL FUNDING GROUP INC. state=FL
+2026-07-09T15:42:45.291953756Z [inf]  [2026-07-09T15:42:45.289Z] [defendant-tools] sos_lookup … entity_name=RFG USA INC state=FL
+2026-07-09T15:42:45.291958429Z [inf]  [2026-07-09T15:42:45.289Z] [defendant-tools] sos_lookup … entity_name=RFG USA HOLDINGS, LLC state=FL
+2026-07-09T15:47:47.501935593Z [err]  [2026-07-09T15:47:45.295Z] [defendant-tools] sos_lookup failed entity_name=TURBOFUNDING LLC state=FL message=The operation was aborted due to timeout
+2026-07-09T15:47:47.501940482Z [inf]  [2026-07-09T15:47:45.295Z] [defendant-tools] sos_lookup ok ms=300007 result=exception
+2026-07-09T15:47:47.501944635Z [err]  [2026-07-09T15:47:45.296Z] [defendant-tools] sos_lookup failed entity_name=ROYAL FUNDING GROUP INC. state=FL message=The operation was aborted due to timeout
+2026-07-09T15:47:47.501948738Z [inf]  [2026-07-09T15:47:45.296Z] [defendant-tools] sos_lookup ok ms=300007 result=exception
+2026-07-09T15:47:47.501953218Z [err]  [2026-07-09T15:47:45.296Z] [defendant-tools] sos_lookup failed entity_name=RFG USA INC state=FL message=The operation was aborted due to timeout
+2026-07-09T15:47:47.501958096Z [inf]  [2026-07-09T15:47:45.297Z] [defendant-tools] sos_lookup ok ms=300008 result=exception
+2026-07-09T15:47:47.501962307Z [err]  [2026-07-09T15:47:45.297Z] [defendant-tools] sos_lookup failed entity_name=RFG USA HOLDINGS, LLC state=FL message=The operation was aborted due to timeout
+2026-07-09T15:47:47.501976845Z [inf]  [2026-07-09T15:47:45.297Z] [defendant-tools] sos_lookup ok ms=300008 result=exception
+2026-07-09T15:47:47.501982054Z [inf]  [2026-07-09T15:47:45.298Z] [defendant-id#03z] companies scored companies=2 bands=pass | pass
+2026-07-09T15:47:47.501986340Z [inf]  [2026-07-09T15:47:45.298Z] [defendant-id#03z] sos lookups summarized attempts=9 flCrossLookups=4 found=4 attached=4 synthesized=0 errors=4
+2026-07-09T15:49:17.513453735Z [inf]  [2026-07-09T15:49:13.568Z] [image-desc#041] request received mediaType=image/jpeg bytes=355702
+2026-07-09T15:49:17.513463496Z [inf]  [2026-07-09T15:49:13.568Z] [image-desc#041] model.describe …
+2026-07-09T15:49:17.513469188Z [inf]  [2026-07-09T15:49:13.614Z] [image-desc#042] request received mediaType=image/jpeg bytes=368914
+2026-07-09T15:49:17.513475692Z [inf]  [2026-07-09T15:49:13.614Z] [image-desc#042] model.describe …
+2026-07-09T15:49:17.513482415Z [inf]  [2026-07-09T15:49:13.661Z] [image-desc#040] request received mediaType=image/jpeg bytes=366293
+2026-07-09T15:49:17.513490499Z [inf]  [2026-07-09T15:49:13.661Z] [image-desc#040] model.describe …
+2026-07-09T15:49:17.513497565Z [inf]  [2026-07-09T15:49:13.781Z] [image-desc#043] request received mediaType=image/jpeg bytes=362493
+2026-07-09T15:49:17.513503831Z [inf]  [2026-07-09T15:49:13.782Z] [image-desc#043] model.describe …
+2026-07-09T15:49:17.513509730Z [err]  [2026-07-09T15:49:14.256Z] [image-desc#042] failed: model threw message=messages.0.content.1.image.source.base64: The image was specified using the image/jpeg media type, but the image appears to be a image/webp image name=AI_APICallError
+2026-07-09T15:49:17.513515784Z [inf]  [2026-07-09T15:49:14.928Z] [image-desc#044] request received mediaType=image/jpeg bytes=305349
+2026-07-09T15:49:17.513521015Z [inf]  [2026-07-09T15:49:14.928Z] [image-desc#044] model.describe …
+2026-07-09T15:49:37.508612399Z [inf]  [2026-07-09T15:49:35.178Z] [image-desc#044] model.describe ok ms=20250 textChars=5040
+2026-07-09T15:49:37.508615836Z [inf]  [2026-07-09T15:49:35.771Z] [image-desc#045] request received mediaType=image/jpeg bytes=146506
+2026-07-09T15:49:37.508619389Z [inf]  [2026-07-09T15:49:35.771Z] [image-desc#045] model.describe …
+2026-07-09T15:49:37.508628409Z [err]  [2026-07-09T15:49:35.926Z] [image-desc#045] failed: model threw message=messages.0.content.1.image.source.base64: The image was specified using the image/jpeg media type, but the image appears to be a image/webp image name=AI_APICallError
+2026-07-09T15:49:37.508632529Z [inf]  [2026-07-09T15:49:35.992Z] [image-desc#043] model.describe ok ms=22210 textChars=5393
+2026-07-09T15:49:37.508636223Z [inf]  [2026-07-09T15:49:36.420Z] [image-desc#040] model.describe ok ms=22759 textChars=5523
+2026-07-09T15:49:37.508639643Z [inf]  [2026-07-09T15:49:37.377Z] [image-desc#041] model.describe ok ms=23809 textChars=5519
+2026-07-09T15:49:38.538350184Z [inf]  [2026-07-09T15:49:38.464Z] [extract-screen#046] request received files=4 kinds=image,image,image,image
+2026-07-09T15:49:38.538355013Z [inf]  [2026-07-09T15:49:38.464Z] [extract-screen#046] model.extract …
+2026-07-09T15:50:08.360271544Z [inf]  [2026-07-09T15:49:58.969Z] [extract-screen#046] model.extract ok ms=20505 contacts=4 declined=false
+2026-07-09T15:50:08.360276498Z [inf]  [2026-07-09T15:49:59.381Z] [defendant-id#047] request received files=4 kinds=image,image,image,image hasFacts=true contacts=4
+2026-07-09T15:50:08.360281253Z [inf]  [2026-07-09T15:49:59.381Z] [defendant-id#047] investigation queued jobId=4d2e29d3-8684-4aa2-bd99-79539002eb97
+2026-07-09T15:50:08.360288926Z [inf]  [2026-07-09T15:49:59.381Z] [defendant-id#047] agent.investigate …
+2026-07-09T15:50:08.360293422Z [inf]  [2026-07-09T15:50:03.937Z] [defendant-tools] web_search … query=Upside Partners "855-284-7312"
+2026-07-09T15:50:08.360298671Z [inf]  [2026-07-09T15:50:03.937Z] [defendant-tools] web_search … query="Upside Partners" debt relief funding company
+2026-07-09T15:50:08.360304002Z [inf]  [2026-07-09T15:50:03.937Z] [defendant-tools] web_search … query=866-545-0304 debt hardship program scam
+2026-07-09T15:50:08.360308003Z [inf]  [2026-07-09T15:50:03.937Z] [defendant-tools] web_search … query=855-883-2001 tax debt relief scam
+2026-07-09T15:50:58.389812363Z [inf]  [2026-07-09T15:50:53.396Z] [defendant-tools] web_search ok ms=49459 answerChars=1428 sources=59
+2026-07-09T15:51:38.122804615Z [inf]  [2026-07-09T15:51:29.127Z] [defendant-tools] web_search ok ms=85190 answerChars=3304 sources=82
+2026-07-09T15:51:38.122808939Z [inf]  [2026-07-09T15:51:36.394Z] [defendant-tools] web_search ok ms=92457 answerChars=2675 sources=127
+2026-07-09T15:52:08.141995439Z [inf]  [2026-07-09T15:51:58.298Z] [defendant-tools] web_search ok ms=114361 answerChars=3310 sources=83
+2026-07-09T15:52:08.141999170Z [inf]  [2026-07-09T15:52:03.158Z] [defendant-tools] web_search … query="727-615-6808"
+2026-07-09T15:52:08.142003115Z [inf]  [2026-07-09T15:52:03.158Z] [defendant-tools] web_search … query="8885203601" OR "888-520-3601" scam
+2026-07-09T15:52:08.142007129Z [inf]  [2026-07-09T15:52:03.158Z] [defendant-tools] web_search … query="949-628-2742"
+2026-07-09T15:52:08.142012636Z [inf]  [2026-07-09T15:52:03.158Z] [defendant-tools] web_search … query="941-395-0006"
+2026-07-09T15:52:08.142016396Z [inf]  [2026-07-09T15:52:03.159Z] [defendant-tools] web_search … query="706-420-2102"
+2026-07-09T15:52:38.144284517Z [inf]  [2026-07-09T15:52:33.259Z] [defendant-tools] web_search ok ms=30101 answerChars=1390 sources=29
+2026-07-09T15:52:45.165513314Z [inf]  [2026-07-09T15:52:45.045Z] [defendant-tools] web_search ok ms=41887 answerChars=1342 sources=52
+2026-07-09T15:52:49.167147019Z [inf]  [2026-07-09T15:52:49.005Z] [defendant-tools] web_search ok ms=45846 answerChars=1220 sources=38
+2026-07-09T15:52:49.777563235Z [inf]  [2026-07-09T15:52:49.766Z] [defendant-tools] web_search ok ms=46608 answerChars=1550 sources=65
+2026-07-09T15:53:39.789021419Z [inf]  [2026-07-09T15:53:32.230Z] [defendant-tools] web_search ok ms=89072 answerChars=1534 sources=94
+2026-07-09T15:53:39.789027354Z [inf]  [2026-07-09T15:53:39.054Z] [defendant-tools] sos_lookup … entity_name=Upside Partners LLC state=DE
+2026-07-09T15:53:39.789032012Z [inf]  [2026-07-09T15:53:39.055Z] [defendant-tools] sos_lookup … entity_name=Upside Partners LLC state=TX
+2026-07-09T15:53:39.789035765Z [inf]  [2026-07-09T15:53:39.055Z] [defendant-tools] sos_lookup … entity_name=Upside Partners LLC state=FL
+2026-07-09T15:53:39.789040088Z [inf]  [2026-07-09T15:53:39.055Z] [defendant-tools] web_search … query="Garrett Black" "Upside Partners" funding
+2026-07-09T15:53:59.533568662Z [inf]  [2026-07-09T15:53:59.085Z] [defendant-tools] sos_lookup ok ms=20030 result=found entity=UPSIDE PARTNERS, LLC
+2026-07-09T15:54:19.529000645Z [inf]  [2026-07-09T15:54:16.249Z] [defendant-tools] web_search ok ms=37194 answerChars=1421 sources=18
+2026-07-09T15:54:28.784587360Z [inf]  [2026-07-09T15:54:28.781Z] [defendant-tools] sos_lookup ok ms=49726 result=found entity=UPSIDE PARTNERS LLC
+2026-07-09T15:55:08.835080757Z [inf]  [2026-07-09T15:55:00.500Z] [defendant-tools] sos_lookup ok ms=81446 result=found entity=
+2026-07-09T15:55:09.249230520Z [inf]  [2026-07-09T15:55:09.226Z] [defendant-tools] web_search … query="Upside Partners LLC" Biscayne Park Florida Rosenberg
+2026-07-09T15:55:09.249238254Z [inf]  [2026-07-09T15:55:09.226Z] [defendant-tools] web_search … query="Upside Partners" debt settlement "next day funding" 855
+2026-07-09T15:55:39.232185502Z [inf]  [2026-07-09T15:55:34.632Z] [defendant-tools] web_search ok ms=25406 answerChars=2130 sources=10
+2026-07-09T15:56:09.256849510Z [inf]  [2026-07-09T15:56:08.333Z] [defendant-tools] web_search ok ms=59107 answerChars=2168 sources=70
+2026-07-09T15:56:11.650452720Z [inf]  [2026-07-09T15:56:11.641Z] [defendant-tools] fetch_page … url=https://theupsidefunding.com/
+2026-07-09T15:56:11.650459396Z [inf]  [2026-07-09T15:56:11.643Z] [defendant-tools] web_search … query="The Upside Funding" reviews scam merchant cash advance
+2026-07-09T15:56:12.514934229Z [inf]  [2026-07-09T15:56:12.512Z] [defendant-tools] fetch_page ok ms=871 status=200 textChars=8000
+2026-07-09T15:57:12.762410960Z [inf]  [2026-07-09T15:57:07.766Z] [defendant-tools] web_search ok ms=56123 answerChars=2847 sources=35
+2026-07-09T15:57:17.092939383Z [inf]  [2026-07-09T15:57:17.082Z] [defendant-tools] web_search … query="alternative debt hardship programs" "September 2025"
+2026-07-09T15:57:17.092947313Z [inf]  [2026-07-09T15:57:17.082Z] [defendant-tools] web_search … query="this is Garrett Black" voicemail scam
+2026-07-09T15:57:17.092952993Z [inf]  [2026-07-09T15:57:17.082Z] [defendant-tools] web_search … query="my name is Howard" "hardship approval" voicemail scam
+2026-07-09T15:57:57.104865645Z [inf]  [2026-07-09T15:57:48.063Z] [defendant-tools] web_search ok ms=30981 answerChars=3381 sources=10
+2026-07-09T15:58:02.188680477Z [inf]  [2026-07-09T15:58:02.051Z] [defendant-tools] web_search ok ms=44969 answerChars=3698 sources=25
+2026-07-09T15:58:42.016072160Z [inf]  [2026-07-09T15:58:40.582Z] [defendant-tools] web_search ok ms=83500 answerChars=2319 sources=110
+2026-07-09T15:59:22.051487202Z [inf]  [2026-07-09T15:59:13.252Z] [defendant-id#047] agent.investigate ok ms=553871 steps=7 reportChars=7061
+2026-07-09T15:59:22.051494320Z [inf]  [2026-07-09T15:59:13.252Z] [defendant-id#047] agent.format …
+2026-07-09T15:59:23.901387238Z [inf]  [2026-07-09T15:59:23.896Z] [defendant-id#047] agent.format ok ms=10644 candidates=1 companies=Upside Partners
+2026-07-09T15:59:23.901394772Z [inf]  [2026-07-09T15:59:23.899Z] [defendant-id#047] companies scored companies=2 bands=pass | pass
+2026-07-09T15:59:23.901399904Z [inf]  [2026-07-09T15:59:23.899Z] [defendant-id#047] sos lookups summarized attempts=3 flCrossLookups=0 found=3 attached=2 synthesized=1 errors=0

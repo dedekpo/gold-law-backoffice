@@ -1,8 +1,9 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { generateText, Output } from "ai";
+import { Output, streamText } from "ai";
 import { z } from "zod";
 import { MODELS, model } from "@/lib/provider";
+import { sniffImageMediaType } from "@/lib/image-media-type";
 import { evaluateIntakeGate } from "@/lib/screening";
 import type { EvidenceFacts } from "@/lib/types";
 import { createLogger, nextRequestId } from "@/lib/logger";
@@ -184,10 +185,11 @@ function buildContent(files: ExtractFile[]): UserContentPart[] {
       text: `### File ${index + 1} — ${label} — ${file.name}`,
     });
     if (file.image) {
+      const data = new Uint8Array(Buffer.from(file.image.data, "base64"));
       content.push({
         type: "file",
-        data: new Uint8Array(Buffer.from(file.image.data, "base64")),
-        mediaType: file.image.mediaType,
+        data,
+        mediaType: sniffImageMediaType(data) ?? file.image.mediaType,
       });
       if (file.text) {
         content.push({
@@ -239,22 +241,34 @@ export async function POST(request: Request) {
 
   try {
     const done = log.start("model.extract");
-    const { output } = await runRateLimited(() =>
-      generateText({
-        model: model(MODELS.analysis),
-        maxRetries: 0,
-        output: Output.object({ schema: factsSchema }),
-        system:
-          "You are an intake analyst for a consumer-protection law firm. From the " +
-          "evidence, extract a normalized list of contacts as STRICT JSON per the " +
-          "schema. Use the classification definitions in the screening spec below " +
-          "(message type, kill signals, consent, opt-out vs confirmation). Extract " +
-          "atomic facts ONLY — do NOT score, do NOT decide which screens apply. " +
-          "Copy timestamps exactly as shown and treat them as the consumer's local " +
-          "time.\n\n" +
-          spec,
-        messages: [{ role: "user", content: buildContent(files) }],
-      }),
+    // Streamed, not generateText: a batch of dozens of screenshots takes the
+    // model >5 minutes to answer, and Node's fetch aborts any request whose
+    // response HEADERS haven't arrived by then (undici UND_ERR_HEADERS_TIMEOUT,
+    // surfaced as "Headers Timeout Error"). Streaming makes headers arrive in
+    // seconds; we still just await the complete parsed output.
+    const output = await runRateLimited(
+      async (): Promise<EvidenceFacts> => {
+        const result = streamText({
+          model: model(MODELS.analysis),
+          maxRetries: 0,
+          output: Output.object({ schema: factsSchema }),
+          system:
+            "You are an intake analyst for a consumer-protection law firm. From the " +
+            "evidence, extract a normalized list of contacts as STRICT JSON per the " +
+            "schema. Use the classification definitions in the screening spec below " +
+            "(message type, kill signals, consent, opt-out vs confirmation). Extract " +
+            "atomic facts ONLY — do NOT score, do NOT decide which screens apply. " +
+            "Copy timestamps exactly as shown and treat them as the consumer's local " +
+            "time.\n\n" +
+            spec,
+          messages: [{ role: "user", content: buildContent(files) }],
+        });
+        // Drain the stream so the result promises settle (an unread stream can
+        // stall on backpressure); errors reject `result.output`, which keeps
+        // runRateLimited's retry-on-transient-failure behaviour intact.
+        void result.consumeStream();
+        return await result.output;
+      },
     );
 
     const facts: EvidenceFacts = output;

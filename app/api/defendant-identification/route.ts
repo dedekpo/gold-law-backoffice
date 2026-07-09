@@ -552,12 +552,13 @@ async function runInvestigation(
       flTargets.set(norm, legalName);
     }
 
-    const flResults =
-      flTargets.size > 0
-        ? await Promise.all(
-            [...flTargets.values()].map((name) => lookupSosEntity(name, "FL")),
-          )
-        : [];
+    // Sequential on purpose: these all hit the SAME state's scraper, which
+    // processes lookups serially — fired concurrently, the later ones spend
+    // their entire abort window queued behind the first and ALL time out.
+    const flResults: SosLookupResult[] = [];
+    for (const name of flTargets.values()) {
+      flResults.push(await lookupSosEntity(name, "FL"));
+    }
     collectEntities(foundEntities, flResults);
 
     // How the Florida check resolved for each legal name — whether the agent ran

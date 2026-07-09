@@ -150,15 +150,16 @@ export const fetchPageTool = tool({
 const OPEN_SOS_BASE_URL = "https://api.opensosdata.com";
 // Live scrapes for slow states (CAPTCHA / multi-step portals like Wyoming) can
 // hold the initial request for minutes before returning data or handing back a
-// 202 job. Give the lookup up to 5 minutes so we stop aborting results the API
-// can actually retrieve. The lightweight status poll keeps a short per-request
-// cap since each check returns immediately.
-const SOS_LOOKUP_TIMEOUT_MS = 300_000;
+// 202 job — and when several lookups for the SAME state queue behind each
+// other, the wall-clock wait compounds. Give the lookup up to 10 minutes so we
+// stop aborting results the API can actually retrieve. The lightweight status
+// poll keeps a short per-request cap since each check returns immediately.
+const SOS_LOOKUP_TIMEOUT_MS = 600_000;
 const SOS_STATUS_TIMEOUT_MS = 30_000;
 // Slow states return 202 + a jobId; we poll the status endpoint until it
-// resolves, for up to the same 5-minute budget.
+// resolves, for up to the same 10-minute budget.
 const SOS_POLL_INTERVAL_MS = 3_000;
-const SOS_MAX_POLL_MS = 300_000;
+const SOS_MAX_POLL_MS = 600_000;
 
 /**
  * A Secretary of State entity record. Mirrors OpenSOSData's `EntityData` shape;

@@ -2,6 +2,7 @@ import { generateText } from "ai";
 import { MODELS, model } from "@/lib/provider";
 import { createLogger, nextRequestId } from "@/lib/logger";
 import { isRateLimitError, runRateLimited } from "@/lib/rate-limit";
+import { sniffImageMediaType } from "@/lib/image-media-type";
 
 const baseLog = createLogger("image-desc");
 
@@ -18,9 +19,14 @@ const PROMPT = [
 
 export async function POST(request: Request) {
   const log = baseLog.child(nextRequestId());
-  const mediaType = request.headers.get("content-type") ?? "image/png";
+  const declaredType = request.headers.get("content-type") ?? "image/png";
   const data = new Uint8Array(await request.arrayBuffer());
-  log.info("request received", { mediaType, bytes: data.byteLength });
+  const mediaType = sniffImageMediaType(data) ?? declaredType;
+  log.info("request received", {
+    mediaType,
+    declaredType: mediaType === declaredType ? undefined : declaredType,
+    bytes: data.byteLength,
+  });
 
   try {
     const done = log.start("model.describe");
