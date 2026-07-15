@@ -24,6 +24,9 @@
 .DS_Store
 *.pem
 
+# local recovery data written before destructive GHL operations — never commit
+/logs/
+
 # Google Cloud service-account keys — NEVER commit
 gen-lang-client-*.json
 *-service-account*.json

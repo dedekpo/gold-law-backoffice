@@ -86,9 +86,10 @@ function errorReason(err: unknown): string | undefined {
 }
 
 // Transient server-side failures worth retrying with backoff: request timeout,
-// conflict, and the 5xx family Google returns when a model is overloaded
-// ("high demand" = 503) or has a brief internal hiccup.
-const RETRYABLE_STATUS = new Set([408, 409, 500, 502, 503, 504]);
+// conflict, the 5xx family Google returns when a model is overloaded
+// ("high demand" = 503) or has a brief internal hiccup, and Anthropic's 529
+// ("overloaded_error" — temporary saturation, their docs say to retry).
+const RETRYABLE_STATUS = new Set([408, 409, 500, 502, 503, 504, 529]);
 
 /** Collect every statusCode hiding on an error or its nested causes. */
 function statusCodesOf(err: unknown): number[] {

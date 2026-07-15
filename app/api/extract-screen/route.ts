@@ -248,10 +248,20 @@ export async function POST(request: Request) {
     // seconds; we still just await the complete parsed output.
     const output = await runRateLimited(
       async (): Promise<EvidenceFacts> => {
+        // streamText does NOT reject on provider errors — it emits them as
+        // error parts on the stream and finishes with empty output, so awaiting
+        // `result.output` would surface a generic NoOutputGeneratedError that
+        // runRateLimited can't classify (a retryable 529 "Overloaded" would be
+        // treated as fatal). Capture the real error via onError and rethrow it
+        // so retry/backoff sees the provider's status code and isRetryable flag.
+        let streamError: unknown;
         const result = streamText({
           model: model(MODELS.analysis),
           maxRetries: 0,
           output: Output.object({ schema: factsSchema }),
+          onError: ({ error }) => {
+            streamError = error;
+          },
           system:
             "You are an intake analyst for a consumer-protection law firm. From the " +
             "evidence, extract a normalized list of contacts as STRICT JSON per the " +
@@ -263,11 +273,15 @@ export async function POST(request: Request) {
             spec,
           messages: [{ role: "user", content: buildContent(files) }],
         });
-        // Drain the stream so the result promises settle (an unread stream can
-        // stall on backpressure); errors reject `result.output`, which keeps
-        // runRateLimited's retry-on-transient-failure behaviour intact.
-        void result.consumeStream();
-        return await result.output;
+        // Drain the stream fully (an unread stream can stall on backpressure,
+        // and this guarantees onError has fired before we inspect the result).
+        await result.consumeStream();
+        if (streamError !== undefined) throw streamError;
+        try {
+          return await result.output;
+        } catch (err) {
+          throw streamError ?? err;
+        }
       },
     );
 
