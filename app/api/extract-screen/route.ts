@@ -5,9 +5,10 @@ import { z } from "zod";
 import { MODELS, model } from "@/lib/provider";
 import { sniffImageMediaType } from "@/lib/image-media-type";
 import { evaluateIntakeGate } from "@/lib/screening";
-import type { EvidenceFacts } from "@/lib/types";
-import { createLogger, nextRequestId } from "@/lib/logger";
+import type { EvidenceFacts, IntakeGate } from "@/lib/types";
+import { createLogger, nextRequestId, type Logger } from "@/lib/logger";
 import { isRateLimitError, runRateLimited } from "@/lib/rate-limit";
+import { getJob, startJob } from "@/lib/jobs";
 
 const baseLog = createLogger("extract-screen");
 
@@ -222,6 +223,17 @@ async function loadScreeningSpec(): Promise<string> {
   return cachedSpec;
 }
 
+type ScreeningResult = { facts: EvidenceFacts; gate: IntakeGate };
+
+// A large batch's extraction can run well past 5 minutes, and Railway's edge
+// proxy closes any HTTP request that goes 5 minutes with no data transferred —
+// the browser gets a 502 while the app-side call finishes normally (nothing in
+// the logs). So, like defendant-identification, POST starts the extraction as a
+// background job and returns a job id immediately; the client polls
+// GET ?jobId=… for the result. `maxDuration` only bounds the (now sub-second)
+// POST/GET handlers — the job keeps running in the long-lived Node process.
+export const maxDuration = 60;
+
 export async function POST(request: Request) {
   const log = baseLog.child(nextRequestId());
   const parsed = requestSchema.safeParse(await request.json());
@@ -237,6 +249,47 @@ export async function POST(request: Request) {
     files: files.length,
     kinds: files.map((f) => f.kind).join(","),
   });
+
+  const jobId = startJob(() => runExtraction(files, log), {
+    isRateLimited: isRateLimitError,
+  });
+  log.info("extraction queued", { jobId });
+  return Response.json({ jobId }, { status: 202 });
+}
+
+// GET ?jobId=… reports the status of a queued extraction. Each poll is a fast,
+// self-contained request, so no proxy timeout can cut the screening mid-run.
+export async function GET(request: Request) {
+  const jobId = new URL(request.url).searchParams.get("jobId");
+  if (!jobId) {
+    return Response.json({ error: "Missing jobId" }, { status: 400 });
+  }
+  const job = getJob<ScreeningResult>(jobId);
+  if (!job) {
+    return Response.json(
+      { error: "Unknown or expired screening. Please run it again." },
+      { status: 404 },
+    );
+  }
+  if (job.status === "done") {
+    return Response.json({ status: "done", ...job.result });
+  }
+  if (job.status === "error") {
+    return Response.json({
+      status: "error",
+      error: job.rateLimited
+        ? "AI gateway rate limit exceeded. Please wait a moment and try again."
+        : job.error,
+      rateLimited: job.rateLimited,
+    });
+  }
+  return Response.json({ status: "running" });
+}
+
+async function runExtraction(
+  files: ExtractFile[],
+  log: Logger,
+): Promise<ScreeningResult> {
   const spec = await loadScreeningSpec();
 
   try {
@@ -292,23 +345,15 @@ export async function POST(request: Request) {
       declined: gate.declined,
       declineReason: gate.declineReason,
     });
-    return Response.json({ facts, gate });
+    return { facts, gate };
   } catch (err) {
-    if (isRateLimitError(err)) {
-      log.error("failed: gateway rate limit exceeded (429)");
-      return Response.json(
-        {
-          error:
-            "AI gateway rate limit exceeded. Please wait a moment and try again.",
-        },
-        { status: 429 },
-      );
-    }
-    const message = err instanceof Error ? err.message : "Extraction failed";
+    // Log with the error's name for diagnosability, then rethrow so the job
+    // store records the failure (the GET handler maps it for the client,
+    // including the friendly rate-limit message).
     log.error("failed: model threw", {
-      message,
+      message: err instanceof Error ? err.message : "Extraction failed",
       name: err instanceof Error ? err.name : typeof err,
     });
-    return Response.json({ error: message }, { status: 500 });
+    throw err;
   }
 }

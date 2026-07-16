@@ -62,8 +62,20 @@ const claudeDefaults = defaultSettingsMiddleware({
  * ("gemini-2.5-flash") and the legacy gateway form ("google/gemini-2.5-flash"),
  * so existing call sites keep working.
  */
+/**
+ * Claude models we deliberately run WITHOUT the adaptive-thinking default.
+ * On the 4.6 family, omitting `thinking` runs thinking-off — the lowest-
+ * latency configuration, which is the point of the search model. (Pre-4.6
+ * ids like claude-sonnet-4-5 would belong here too: they reject the adaptive
+ * param outright.)
+ */
+const THINKING_OFF_MODELS = new Set(["claude-sonnet-4-6"]);
+
 export function model(id: string) {
   if (id.startsWith("claude-")) {
+    if (THINKING_OFF_MODELS.has(id)) {
+      return anthropic(id);
+    }
     return wrapLanguageModel({
       model: anthropic(id),
       middleware: claudeDefaults,
@@ -92,6 +104,13 @@ export const MODELS = {
   media: "claude-sonnet-5",
   /** Defendant agent tool loop + report formatting. */
   agent: "claude-sonnet-5",
+  /**
+   * Web-search backend (the agent's web_search tool). Sonnet 4.6 on purpose:
+   * Sonnet 5 nearly doubled search latency, and synthesizing search results
+   * doesn't need frontier reasoning. Runs thinking-off for latency (see
+   * THINKING_OFF_MODELS above).
+   */
+  search: "claude-sonnet-4-6",
   /** Audio transcription — Gemini native-audio, fast tier. */
   audio: "gemini-2.5-flash",
   /** Audio forensics — Gemini native-audio, pro tier for careful judgment. */

@@ -89,14 +89,68 @@ const ENDPOINTS: Record<FileKind, string> = {
   image: "/api/image-description",
 };
 
-// Defendant identification runs as a background job we poll for. Polling every
-// few seconds keeps each request short (so a proxy can't time it out), and we
-// tolerate a run of failed polls before giving up so a transient network/proxy
-// blip doesn't abandon a job that is still running on the server.
-const DEFENDANT_POLL_INTERVAL_MS = 3000;
-const DEFENDANT_MAX_POLL_FAILURES = 10;
+// Screening and defendant identification run as background jobs we poll for.
+// Polling every few seconds keeps each request short (so a proxy can't time it
+// out), and we tolerate a run of failed polls before giving up so a transient
+// network/proxy blip doesn't abandon a job that is still running on the server.
+const JOB_POLL_INTERVAL_MS = 3000;
+const JOB_MAX_POLL_FAILURES = 10;
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// Poll a background-job endpoint (whose POST returned { jobId }) until the job
+// reaches a terminal state, and return the "done" payload. A failed poll
+// (dropped connection, a brief 5xx from the proxy) is retried rather than
+// treated as failure, so a still-running job is never abandoned; only a 404
+// (job expired server-side) or a sustained run of failures gives up.
+async function pollJob<TDone>(
+  endpoint: string,
+  jobId: string,
+  messages: {
+    expiredMessage: string;
+    lostMessage: string;
+    failedMessage: string;
+  },
+): Promise<TDone> {
+  let pollFailures = 0;
+  while (true) {
+    await sleep(JOB_POLL_INTERVAL_MS);
+
+    let pollRes: Response;
+    try {
+      pollRes = await fetch(`${endpoint}?jobId=${encodeURIComponent(jobId)}`);
+    } catch {
+      if (++pollFailures > JOB_MAX_POLL_FAILURES) {
+        throw new Error(messages.lostMessage);
+      }
+      continue;
+    }
+
+    if (pollRes.status === 404) {
+      throw new Error(messages.expiredMessage);
+    }
+    if (!pollRes.ok) {
+      // Transient proxy/server error — retry on the next tick.
+      if (++pollFailures > JOB_MAX_POLL_FAILURES) {
+        throw new Error(messages.lostMessage);
+      }
+      continue;
+    }
+
+    pollFailures = 0;
+    const data = (await pollRes.json().catch(() => null)) as
+      | { status: "running" }
+      | ({ status: "done" } & TDone)
+      | { status: "error"; error?: string }
+      | null;
+
+    if (!data || data.status === "running") continue;
+    if (data.status === "error") {
+      throw new Error(data.error ?? messages.failedMessage);
+    }
+    return data;
+  }
+}
 
 // Bound how many transcription/forensics requests are in flight to the server at
 // once. Each is a held HTTP request, so a big upload (e.g. 28 files → ~56 calls)
@@ -205,21 +259,30 @@ export default function Home() {
         }),
       );
 
-      const response = await fetch("/api/extract-screen", {
+      // Start the extraction as a background job. The POST returns a job id in
+      // well under a second, so a proxy timeout can't cut it — a large batch
+      // previously held this request past Railway's 5-minute limit and
+      // surfaced as a silent "Screening failed: 502".
+      const startRes = await fetch("/api/extract-screen", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ files: filesPayload }),
       });
-      if (!response.ok) {
-        const body = (await response.json().catch(() => null)) as
+      if (!startRes.ok) {
+        const body = (await startRes.json().catch(() => null)) as
           | { error?: string }
           | null;
-        throw new Error(body?.error ?? `Screening failed: ${response.status}`);
+        throw new Error(body?.error ?? `Screening failed: ${startRes.status}`);
       }
-      const { facts, gate } = (await response.json()) as {
+      const { jobId } = (await startRes.json()) as { jobId: string };
+      const { facts, gate } = await pollJob<{
         facts: EvidenceFacts;
         gate: IntakeGate;
-      };
+      }>("/api/extract-screen", jobId, {
+        expiredMessage: "Screening expired on the server. Please run it again.",
+        lostMessage: "Lost connection while screening the evidence.",
+        failedMessage: "Screening failed",
+      });
       setCases((prev) =>
         prev.map((entry) =>
           entry.id === caseId
@@ -315,54 +378,14 @@ export default function Home() {
         ),
       );
 
-      // Poll until the job reaches a terminal state. A failed poll (dropped
-      // connection, a brief 5xx from the proxy) is retried rather than treated
-      // as failure, so the still-running job is never abandoned.
-      let pollFailures = 0;
-      let report: DefendantReport | null = null;
-      while (!report) {
-        await sleep(DEFENDANT_POLL_INTERVAL_MS);
-
-        let pollRes: Response;
-        try {
-          pollRes = await fetch(
-            `/api/defendant-identification?jobId=${encodeURIComponent(jobId)}`,
-          );
-        } catch {
-          if (++pollFailures > DEFENDANT_MAX_POLL_FAILURES) {
-            throw new Error("Lost connection while identifying the company.");
-          }
-          continue;
-        }
-
-        if (pollRes.status === 404) {
-          throw new Error(
-            "Investigation expired on the server. Please run it again.",
-          );
-        }
-        if (!pollRes.ok) {
-          // Transient proxy/server error — retry on the next tick.
-          if (++pollFailures > DEFENDANT_MAX_POLL_FAILURES) {
-            throw new Error("Lost connection while identifying the company.");
-          }
-          continue;
-        }
-
-        pollFailures = 0;
-        const data = (await pollRes.json().catch(() => null)) as
-          | { status: "running" }
-          | { status: "done"; report: DefendantReport }
-          | { status: "error"; error?: string }
-          | null;
-
-        if (!data || data.status === "running") continue;
-        if (data.status === "error") {
-          throw new Error(data.error ?? "Identification failed");
-        }
-        report = data.report;
-      }
-
-      const finalReport = report;
+      const { report: finalReport } = await pollJob<{
+        report: DefendantReport;
+      }>("/api/defendant-identification", jobId, {
+        expiredMessage:
+          "Investigation expired on the server. Please run it again.",
+        lostMessage: "Lost connection while identifying the company.",
+        failedMessage: "Identification failed",
+      });
       setCases((prev) =>
         prev.map((entry) =>
           entry.id === caseId

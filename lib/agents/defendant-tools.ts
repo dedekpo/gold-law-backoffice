@@ -49,8 +49,11 @@ function htmlToText(html: string): string {
 /**
  * Web search backed by a Claude model with Anthropic's server-side web search
  * tool. Returns a synthesized answer plus the source URLs it cited, so the
- * agent can follow up with `fetch_page` on the most promising links. Same
- * provider/model family as the rest of the investigation (see MODELS.agent).
+ * agent can follow up with `fetch_page` on the most promising links. Runs on
+ * MODELS.search (Sonnet 4.6, thinking off — much faster than Sonnet 5 here).
+ * The basic 20250305 search variant is deliberate too: 4.6 does support
+ * webSearch_20260209, but that one runs code-execution-based result filtering
+ * under the hood, which costs latency this tool doesn't need.
  */
 export const webSearchTool = tool({
   description:
@@ -66,7 +69,7 @@ export const webSearchTool = tool({
     const done = log.start("web_search", { query });
     try {
       const { text, sources } = await generateText({
-        model: rateLimitedModel(MODELS.agent),
+        model: rateLimitedModel(MODELS.search),
         maxRetries: 0,
         // Claude answers well-known queries from memory unless told otherwise;
         // this tool's contract is a live search with citable URLs, so force it.
@@ -77,7 +80,7 @@ export const webSearchTool = tool({
         prompt: query,
         // Anthropic's server-side web search: the API runs the searches and
         // returns cited results; the AI SDK surfaces citations as `sources`.
-        tools: { web_search: anthropic.tools.webSearch_20260209({}) },
+        tools: { web_search: anthropic.tools.webSearch_20250305({}) },
       });
       const urls = sourceUrls(sources);
       done({ answerChars: text.length, sources: urls.length });
