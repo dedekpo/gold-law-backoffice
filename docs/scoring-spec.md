@@ -63,15 +63,17 @@ Base = the **highest theory present** (from the four screens):
 | Tier | Theory | Base | MVP |
 |---|---|---|---|
 | Tier 1 | Prerecorded/artificial voice · Internal DNC (64.1200(d)) | 18 | live (Screens 01, 02-marketing) |
-| Tier 2 | Florida DNC / FTSA | 13 | **0 — DNC unverified, flagged** |
+| Tier 2 | Florida DNC / FTSA | 13 | live when operator-attested (Screen 04); else 0, flagged |
 | Tier 3 | Quiet hours | 9 | live (Screen 03) |
-| Tier 4 | National DNC registry | 7 | **0 — DNC unverified, flagged** |
+| Tier 4 | National DNC registry | 7 | live when operator-attested (Screen 04); else 0, flagged |
 
 **Stacking add-on** (over *distinct verified* theories present): **+3** for a 2nd, **+6** for 3+.
 **Caps at 24.**
 
-- MVP: Tiers 2 and 4 are unverified, so they contribute neither base nor a distinct theory for
-  stacking; they only add a flagged unknown ("DNC status unverified — could raise score").
+- Tiers 2 and 4 score only when the registration was confirmed by an intaker's manual registry
+  lookup (the interim operator attestation — see screening-spec Screen 04); a confirmed FL and
+  national registration are distinct theories for stacking. Unconfirmed, they contribute neither
+  base nor stacking — only a flagged unknown ("DNC status unverified — could raise score").
 - "Distinct theory" = a distinct screen hit. Screens 01 and 02 both map to Tier 1 but are
   **distinct theories** for stacking (prerecorded voice vs. failure-to-stop are separate claims).
 
@@ -204,7 +206,7 @@ killCheck, unknowns: string[] }` where `ScoreFactor = { name, points, max, basis
 
 | Input | MVP | Future |
 |---|---|---|
-| Claim Tiers 2 & 4 (DNC) | 0 points, flagged | award on verified DNC |
+| Claim Tiers 2 & 4 (DNC) | scored on operator-attested registration; else 0, flagged | award on API-verified DNC |
 | Willfulness repeat-offender (18) | not scored | firm list / GHL |
 | Willfulness high-volume (+6) | toggle OFF, threshold 10 | flip on if desired |
 

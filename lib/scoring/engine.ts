@@ -22,8 +22,9 @@ export type ClaimTheory = {
   /** Claim Type tier (scoring-spec §3.1). DNC can be Tier 2 (FL) or Tier 4 (federal). */
   tier: 1 | 2 | 3 | 4;
   /**
-   * Whether the theory is confirmed and so counts for points. MVP: DNC theories
-   * are `false` (unverified — no API yet) and contribute only a flagged unknown.
+   * Whether the theory is confirmed and so counts for points. DNC theories are
+   * verified by an operator-attested registry lookup (interim, until the API
+   * check lands); unverified ones contribute only a flagged unknown.
    */
   verified: boolean;
 };

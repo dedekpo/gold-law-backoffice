@@ -134,19 +134,27 @@ Each screen runs over **one company's attributed, in-window evidence** and retur
 - **Debt-collection branch:** out of MVP scope (debt scope is limited to Screen 02 text
   follow-ups). Do not produce a debt-track quiet-hours hit for now.
 
-### Screen 04 — Do-Not-Call Registry  *(MVP: detect + flag, no points)*
+### Screen 04 — Do-Not-Call Registry  *(interim: operator attestation)*
 - **Trigger:** telemarketing **only** (debt collection never applies). The consumer's number is
   on a DNC list:
   - **Federal NDNC:** ≥2 telemarketing texts within any 12-month window (the two can be far
     apart — Dec + Feb both count).
   - **Florida DNC:** even a **single** telemarketing text (always check the FL list when the
     consumer or company is in Florida).
-- **MVP behavior:** registration status **cannot be verified** (no DNC API yet). The screen is
-  evaluated for *applicability* only and returns `hit = false, unverified = true`. It awards
-  **no** Claim Tier 2/4 points and is surfaced as a score-raising unknown
-  (`"DNC status unverified — pending API"`). Never take the client's word as a confirmed hit.
-- **When the API lands:** `unverified` clears; a confirmed registration makes the screen hit and
-  unlocks Claim Tier 2 (FL DNC) / Tier 4 (Nat'l DNC).
+- **Registration source (interim, until the registry API check lands):** two case-level
+  checkboxes at case creation — "National DNC" and "Florida DNC" — ticked by an **intaker after
+  a manual lookup on the registry sites**. This is an operator attestation of a performed check,
+  NOT the client's word (which is still never taken as a confirmed hit).
+  - **Florida confirmed** → hit (≥1 telemarketing contact), unlocks Claim Tier 2.
+  - **National confirmed** → hit only with ≥2 telemarketing contacts, unlocks Claim Tier 4.
+    With a single contact the basis explains the federal 2-contact rule and no tier unlocks.
+  - Both confirmed → one hit carrying both tiers (they count as distinct theories for stacking).
+- **Unchecked boxes mean "not confirmed"** — either nobody looked or the lookup was negative —
+  so the screen keeps its prior behavior: `hit = false, unverified = true`, no Claim Tier 2/4
+  points, surfaced as the score-raising unknown (`"DNC status unverified — pending registry
+  check"`).
+- **When the API lands:** the checkboxes are replaced by an automated lookup of the client's
+  number; `unverified` clears the same way.
 
 ---
 
@@ -157,7 +165,7 @@ Each screen runs over **one company's attributed, in-window evidence** and retur
 | 01 Prerecorded voice | TCPA | (n/a) | no claim |
 | 02 Failure to stop (IDNC) | TCPA | **Debt track** (text follow-up only, MVP) | no claim |
 | 03 Quiet hours | TCPA | out of MVP scope | no claim |
-| 04 DNC registry | TCPA *(MVP: unverified)* | (n/a) | no claim |
+| 04 DNC registry | TCPA *(hit only with an operator-attested registration)* | (n/a) | no claim |
 
 - **TCPA-track** companies flow into the scoring engine (`scoring-spec.md`).
 - **Debt-collection-track** companies are **detected, flagged, and parked** — not scored by the
@@ -171,7 +179,7 @@ Each screen runs over **one company's attributed, in-window evidence** and retur
 
 | Capability | MVP behavior |
 |---|---|
-| DNC verification | Screen 04 applicability only; `unverified = true`, 0 points, flagged unknown |
+| DNC verification | operator-attested checkboxes (manual registry lookup); no attestation → `unverified = true`, 0 points, flagged unknown |
 | Recipient timezone | not needed — screenshot timestamp treated as local |
 | Debt-collection track | only Screen 02 text follow-up; routed + parked, not scored |
 | Repeat-offender list | not used in screening (see scoring-spec §Willfulness) |

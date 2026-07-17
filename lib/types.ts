@@ -157,6 +157,20 @@ export type ScreenId =
   | "quiet_hours"
   | "dnc_registry";
 
+/**
+ * Operator-attested DNC registrations, ticked by an intaker AFTER a manual
+ * lookup on the registry sites confirmed the client's number. Unchecked means
+ * "not confirmed" — either nobody looked or the lookup came back negative —
+ * and keeps the screen in its unverified state; it never means a verified
+ * non-registration. Interim input until the registry API check lands.
+ */
+export type DncStatus = {
+  /** National DNC registry (federal — Claim Tier 4, needs ≥2 telemarketing contacts). */
+  national: boolean;
+  /** Florida DNC list (Claim Tier 2, a single telemarketing contact suffices). */
+  florida: boolean;
+};
+
 /** Result of one of the four screens for one company (screening-spec §4). */
 export type ScreenResult = {
   screen: ScreenId;
@@ -167,6 +181,8 @@ export type ScreenResult = {
   basis: string;
   /** Applicable but unconfirmable (e.g. DNC needs the API). MVP: Screen 04. */
   unverified?: boolean;
+  /** DNC only: claim tiers unlocked by confirmed registrations (2 = FL, 4 = national). */
+  dncTiers?: Array<2 | 4>;
 };
 
 export type KillReason = "job_scam" | "true_healthcare";
@@ -318,6 +334,10 @@ export type Case = {
   /** When processing reached a terminal state (ms epoch); freezes the clock. */
   completedAt?: number;
   files: CaseFile[];
+  /** Operator-attested DNC registrations captured when the case was created. */
+  dnc?: DncStatus;
+  /** Id of the GHL opportunity this case was imported from, when applicable. */
+  opportunityId?: string;
   /** Normalized facts extracted from the evidence; input to screening + scoring. */
   facts?: EvidenceFacts;
   /** Intake-level gate outcome (SOL + plausible-claim). Set by the extraction step. */

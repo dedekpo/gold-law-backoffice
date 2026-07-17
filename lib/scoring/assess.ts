@@ -10,6 +10,7 @@ import {
 } from "@/lib/screening";
 import type {
   ConsentSignal,
+  DncStatus,
   ExtractedContact,
   ScreenResult,
   Scorecard,
@@ -131,8 +132,13 @@ function theoriesFromScreens(screens: ScreenResult[]): ClaimTheory[] {
       theories.push({ screen: s.screen, tier: 1, verified: true });
     } else if (s.screen === "quiet_hours" && s.hit) {
       theories.push({ screen: s.screen, tier: 3, verified: true });
+    } else if (s.screen === "dnc_registry" && s.hit) {
+      // Operator-confirmed registration(s): Tier 2 (FL) and/or Tier 4 (national).
+      for (const tier of s.dncTiers ?? []) {
+        theories.push({ screen: s.screen, tier, verified: true });
+      }
     } else if (s.screen === "dnc_registry" && s.unverified) {
-      // Unverified (MVP) — contributes no points, only a flagged unknown.
+      // Unconfirmed — contributes no points, only a flagged unknown.
       theories.push({ screen: s.screen, tier: 4, verified: false });
     }
   }
@@ -141,13 +147,15 @@ function theoriesFromScreens(screens: ScreenResult[]): ClaimTheory[] {
 
 /**
  * Assess one company against its attributed evidence: screens, kill check, track,
- * and (for the TCPA track) the deterministic scorecard.
+ * and (for the TCPA track) the deterministic scorecard. `intake.dnc` carries the
+ * operator-attested DNC registrations (case-level, applies to every company).
  */
 export function assessCompany(
   company: ScorableCompany,
   contacts: ExtractedContact[],
+  intake: { dnc?: DncStatus } = {},
 ): CompanyAssessment {
-  const screens = runScreens(contacts);
+  const screens = runScreens(contacts, intake);
   const killCheck = checkKillConditions(contacts);
 
   const hasTcpaHit = screens.some((s) => s.hit && s.track === "tcpa");

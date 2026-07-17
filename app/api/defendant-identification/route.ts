@@ -404,6 +404,14 @@ const requestSchema = z.object({
       notes: z.array(z.string()).optional(),
     })
     .optional(),
+  // Operator-attested DNC registrations (manual registry lookups by an intaker).
+  // Case-level: feeds Screen 04 for every identified company.
+  dnc: z
+    .object({
+      national: z.boolean(),
+      florida: z.boolean(),
+    })
+    .optional(),
 });
 
 // The investigation can run for ~10 minutes. Rather than hold one HTTP request
@@ -464,7 +472,7 @@ export async function GET(request: Request) {
 }
 
 async function runInvestigation(
-  { files, facts }: z.infer<typeof requestSchema>,
+  { files, facts, dnc }: z.infer<typeof requestSchema>,
   log: Logger,
 ): Promise<DefendantResponse> {
   log.info("request received", {
@@ -472,6 +480,7 @@ async function runInvestigation(
     kinds: files.map((f) => f.kind).join(","),
     hasFacts: Boolean(facts),
     contacts: facts?.contacts.length ?? 0,
+    dnc: dnc ? `national=${dnc.national} florida=${dnc.florida}` : "none",
   });
 
   const fileBlocks = files
@@ -710,7 +719,7 @@ async function runInvestigation(
         const companyContacts = mergedContacts.filter((c) =>
           candidate.evidence_files.includes(c.file),
         );
-        const assessment = assessCompany(candidate, companyContacts);
+        const assessment = assessCompany(candidate, companyContacts, { dnc });
         return {
           ...candidate,
           track: assessment.track,

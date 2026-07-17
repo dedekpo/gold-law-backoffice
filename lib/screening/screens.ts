@@ -2,6 +2,7 @@
 // — see docs/screening-spec.md §4 and docs/scoring-spec.md §2. Pure functions.
 
 import {
+  type DncStatus,
   type ExtractedContact,
   type KillCheck,
   type ScreenResult,
@@ -163,17 +164,52 @@ function screenQuietHours(contacts: ExtractedContact[]): ScreenResult {
   };
 }
 
-// --- Screen 04 — Do-Not-Call Registry (MVP: detect + flag, no points) -------
-function screenDnc(contacts: ExtractedContact[]): ScreenResult {
-  const telemarketing = contacts.some(
+// --- Screen 04 — Do-Not-Call Registry ---------------------------------------
+// Registration comes from the operator-attested checkboxes (an intaker's manual
+// registry lookup) until the API check lands. Federal NDNC needs ≥2
+// telemarketing contacts (Tier 4); Florida DNC hits on a single one (Tier 2).
+// No attestation → unverified flag (registration status unknown), as before.
+function screenDnc(
+  contacts: ExtractedContact[],
+  dnc: DncStatus | undefined,
+): ScreenResult {
+  const telemarketing = contacts.filter(
     (c) => c.direction !== "from_consumer" && c.messageType === "marketing",
-  );
-  if (!telemarketing) {
+  ).length;
+  if (telemarketing === 0) {
     return {
       screen: "dnc_registry",
       hit: false,
       track: null,
       basis: "Not telemarketing — DNC registry does not apply.",
+    };
+  }
+
+  const tiers: Array<2 | 4> = [];
+  const parts: string[] = [];
+  if (dnc?.florida) {
+    tiers.push(2);
+    parts.push("Florida DNC registration confirmed by manual lookup");
+  }
+  if (dnc?.national) {
+    if (telemarketing >= 2) {
+      tiers.push(4);
+      parts.push(
+        `National DNC registration confirmed by manual lookup (${telemarketing} telemarketing contacts)`,
+      );
+    } else {
+      parts.push(
+        "National DNC registration confirmed, but only 1 telemarketing contact (federal claim needs ≥2)",
+      );
+    }
+  }
+  if (tiers.length > 0) {
+    return {
+      screen: "dnc_registry",
+      hit: true,
+      track: "tcpa",
+      dncTiers: tiers,
+      basis: `${parts.join("; ")}.`,
     };
   }
   return {
@@ -182,17 +218,22 @@ function screenDnc(contacts: ExtractedContact[]): ScreenResult {
     track: null,
     unverified: true,
     basis:
-      "Telemarketing present, but DNC registration cannot be verified yet (no API). Flagged — could add a Florida/National DNC theory once confirmed.",
+      parts.length > 0
+        ? `Telemarketing present. ${parts.join("; ")}. Florida DNC not confirmed — flagged for a registry check.`
+        : "Telemarketing present, but no DNC registration was confirmed (registry not checked, or the client is not registered). Flagged — a confirmed registration would add a Florida/National DNC theory.",
   };
 }
 
 /** Run all four screens over one company's attributed evidence. */
-export function runScreens(contacts: ExtractedContact[]): ScreenResult[] {
+export function runScreens(
+  contacts: ExtractedContact[],
+  intake: { dnc?: DncStatus } = {},
+): ScreenResult[] {
   return [
     screenPrerecorded(contacts),
     screenFailureToStop(contacts),
     screenQuietHours(contacts),
-    screenDnc(contacts),
+    screenDnc(contacts, intake.dnc),
   ];
 }
 

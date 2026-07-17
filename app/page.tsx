@@ -1,12 +1,6 @@
 "use client";
 
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  type ChangeEvent,
-} from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { amrToWavBlob, isAmr } from "@/lib/audio";
 import { formatCaseName } from "@/lib/display";
 import type {
@@ -21,15 +15,11 @@ import type {
 import { CaseSidebar } from "@/components/case-sidebar";
 import { CaseDetail } from "@/components/case-detail";
 import { FileModal } from "@/components/evidence";
-
-function detectKind(blob: Blob, name: string): FileKind | null {
-  if (blob.type.startsWith("image/")) return "image";
-  if (blob.type.startsWith("audio/")) return "audio";
-  const lower = name.toLowerCase();
-  if (/\.(png|jpe?g|gif|webp|bmp|svg|heic|heif|avif)$/.test(lower)) return "image";
-  if (/\.(mp3|wav|ogg|m4a|aac|flac|webm|amr|3gp|opus)$/.test(lower)) return "audio";
-  return null;
-}
+import {
+  NewCaseModal,
+  type NewCaseInput,
+  type NewCaseMeta,
+} from "@/components/new-case-modal";
 
 function randomId(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
@@ -182,6 +172,7 @@ export default function Home() {
   const [cases, setCases] = useState<Case[]>([]);
   const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
   const [openFile, setOpenFile] = useState<CaseFile | null>(null);
+  const [showNewCase, setShowNewCase] = useState(false);
 
   const casesRef = useRef<Case[]>([]);
   const extractedRef = useRef<Set<string>>(new Set());
@@ -361,6 +352,8 @@ export default function Home() {
           // Normalized facts from the extraction pass, used to screen + score
           // each identified company.
           facts: c.facts,
+          // Operator-attested DNC registrations from case creation (Screen 04).
+          dnc: c.dnc,
         }),
       });
       if (!startRes.ok) {
@@ -569,9 +562,7 @@ export default function Home() {
     };
   }
 
-  async function createCase(
-    inputs: { blob: Blob; name: string; kind: FileKind }[],
-  ) {
+  async function createCase(inputs: NewCaseInput[], meta: NewCaseMeta) {
     if (inputs.length === 0) return;
     const built = await Promise.all(
       inputs.map((input) => buildCaseFile(input.blob, input.name, input.kind)),
@@ -579,9 +570,11 @@ export default function Home() {
     const caseId = randomId();
     const newCase: Case = {
       id: caseId,
-      name: formatCaseName(new Date()),
+      name: meta.name ?? formatCaseName(new Date()),
       createdAt: Date.now(),
       files: built.map((b) => b.file),
+      dnc: meta.dnc,
+      opportunityId: meta.opportunityId,
       screeningStatus: "idle",
       defendantStatus: "idle",
     };
@@ -592,22 +585,6 @@ export default function Home() {
     });
   }
 
-  function handleFiles(event: ChangeEvent<HTMLInputElement>) {
-    const files = event.target.files;
-    if (!files) return;
-    const inputs = Array.from(files)
-      .map((file) => {
-        const kind = detectKind(file, file.name);
-        return kind ? { blob: file, name: file.name, kind } : null;
-      })
-      .filter(
-        (value): value is { blob: File; name: string; kind: FileKind } =>
-          value !== null,
-      );
-    void createCase(inputs);
-    event.target.value = "";
-  }
-
   const selectedCase = cases.find((c) => c.id === selectedCaseId) ?? null;
 
   return (
@@ -616,7 +593,7 @@ export default function Home() {
         cases={cases}
         selectedCaseId={selectedCaseId}
         onSelect={setSelectedCaseId}
-        onUpload={handleFiles}
+        onNewCase={() => setShowNewCase(true)}
       />
 
       {selectedCase ? (
@@ -624,11 +601,18 @@ export default function Home() {
       ) : (
         <div className="flex flex-1 items-center justify-center p-8 text-center">
           <p className="max-w-sm text-sm text-zinc-500 dark:text-zinc-400">
-            Upload audio or image files to open a case. Each case is evaluated
-            against the TCPA rubric, then investigated to identify the company
-            behind it.
+            Open a case from uploaded audio/image files or from a GHL
+            opportunity URL. Each case is evaluated against the TCPA rubric,
+            then investigated to identify the company behind it.
           </p>
         </div>
+      )}
+
+      {showNewCase && (
+        <NewCaseModal
+          onClose={() => setShowNewCase(false)}
+          onCreate={(inputs, meta) => void createCase(inputs, meta)}
+        />
       )}
 
       {openFile && (

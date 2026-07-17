@@ -1,6 +1,5 @@
 "use client";
 
-import type { ChangeEvent } from "react";
 import type { Band, Case } from "@/lib/types";
 import { bandTone, bestBand } from "@/lib/display";
 import { UploadIcon } from "./icons";
@@ -9,12 +8,12 @@ export function CaseSidebar({
   cases,
   selectedCaseId,
   onSelect,
-  onUpload,
+  onNewCase,
 }: {
   cases: Case[];
   selectedCaseId: string | null;
   onSelect: (id: string) => void;
-  onUpload: (event: ChangeEvent<HTMLInputElement>) => void;
+  onNewCase: () => void;
 }) {
   return (
     <aside className="flex min-h-0 w-72 shrink-0 flex-col border-r border-zinc-200 bg-zinc-50/60 dark:border-zinc-800 dark:bg-zinc-950/40">
@@ -22,23 +21,20 @@ export function CaseSidebar({
         <h1 className="px-1 pb-1 text-sm font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">
           Intake cases
         </h1>
-        <label className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-zinc-300 px-4 py-2.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-900">
+        <button
+          type="button"
+          onClick={onNewCase}
+          className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-zinc-300 px-4 py-2.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-900"
+        >
           <UploadIcon />
-          Upload files
-          <input
-            type="file"
-            accept="audio/*,image/*"
-            multiple
-            onChange={onUpload}
-            className="hidden"
-          />
-        </label>
+          New case
+        </button>
       </div>
 
       <nav className="flex-1 overflow-y-auto p-2">
         {cases.length === 0 ? (
           <p className="px-3 py-6 text-center text-xs text-zinc-500 dark:text-zinc-400">
-            No cases yet. Upload files to start one.
+            No cases yet. Create one from uploaded files or a GHL opportunity.
           </p>
         ) : (
           <ul className="flex flex-col gap-1">

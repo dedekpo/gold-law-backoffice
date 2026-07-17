@@ -34,6 +34,14 @@ export function CaseDetail({
             {processingCount > 0 && ` · ${processingCount} processing`}
             {errorCount > 0 && ` · ${errorCount} failed`}
           </p>
+          {(caseItem.dnc?.national || caseItem.dnc?.florida) && (
+            <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400">
+              DNC confirmed by manual lookup:
+              {caseItem.dnc.national && " National"}
+              {caseItem.dnc.national && caseItem.dnc.florida && " ·"}
+              {caseItem.dnc.florida && " Florida"}
+            </p>
+          )}
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1.5">
           <CaseStatusBadge caseItem={caseItem} />
