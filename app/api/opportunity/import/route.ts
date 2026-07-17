@@ -2,6 +2,7 @@ import { z } from "zod";
 import { GhlError, ghlFetch, ghlLocationId } from "@/lib/ghl";
 import { detectKind } from "@/lib/file-kind";
 import { createLogger, nextRequestId } from "@/lib/logger";
+import { fetchContactNotes, findReportNote } from "@/lib/opportunity-note";
 import type { FileKind } from "@/lib/types";
 
 const baseLog = createLogger("opportunity-import");
@@ -153,11 +154,34 @@ export async function POST(request: Request) {
       }
     }
 
+    // A previous agent run leaves a fixed-title note on the opportunity; report
+    // it so the UI can ask before running again. Notes live under the contact
+    // (with an opportunity relation), so no contact → no note to find.
+    let existingReport: { noteId: string; dateAdded: string | null } | null =
+      null;
+    if (opportunity.contactId) {
+      try {
+        const note = findReportNote(
+          await fetchContactNotes(opportunity.contactId),
+          opportunityId,
+        );
+        if (note) {
+          existingReport = { noteId: note.id, dateAdded: note.dateAdded ?? null };
+        }
+      } catch (err) {
+        // Non-fatal: failing to list notes shouldn't block an import.
+        log.warn("could not check for an existing report note", {
+          message: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+
     log.info("opportunity imported", {
       opportunityId,
       name: opportunity.name,
       files: files.length,
       skipped,
+      existingReport: existingReport?.noteId ?? "none",
     });
 
     return Response.json({
@@ -169,6 +193,7 @@ export async function POST(request: Request) {
       },
       files,
       skipped,
+      existingReport,
     });
   } catch (err) {
     if (err instanceof GhlError && err.status === 404) {

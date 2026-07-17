@@ -20,6 +20,8 @@ type ImportResponse = {
   opportunity: { id: string; name: string };
   files: { url: string; name: string; mimetype: string; kind: FileKind }[];
   skipped: number;
+  /** A previous agent run's report note, when one exists on the opportunity. */
+  existingReport: { noteId: string; dateAdded: string | null } | null;
 };
 
 /**
@@ -42,6 +44,11 @@ export function NewCaseModal({
   const [dncFlorida, setDncFlorida] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Import held for confirmation because the agent already ran (a report note
+  // exists on the opportunity). The user decides whether to run again.
+  const [pendingImport, setPendingImport] = useState<ImportResponse | null>(
+    null,
+  );
   const busyRef = useRef(false);
 
   useEffect(() => {
@@ -59,6 +66,27 @@ export function NewCaseModal({
 
   const dnc: DncStatus = { national: dncNational, florida: dncFlorida };
 
+  /** Download an import's evidence and hand the case off to the pipeline. */
+  async function launchImport(data: ImportResponse) {
+    const inputs = await Promise.all(
+      data.files.map(async (file): Promise<NewCaseInput> => {
+        const download = await fetch(
+          `/api/opportunity/file?url=${encodeURIComponent(file.url)}`,
+        );
+        if (!download.ok) {
+          throw new Error(`Could not download ${file.name}.`);
+        }
+        return { blob: await download.blob(), name: file.name, kind: file.kind };
+      }),
+    );
+    onCreate(inputs, {
+      dnc,
+      name: data.opportunity.name,
+      opportunityId: data.opportunity.id,
+    });
+    onClose();
+  }
+
   async function start() {
     setError(null);
     busyRef.current = true;
@@ -75,6 +103,7 @@ export function NewCaseModal({
           throw new Error("None of the selected files are audio or images.");
         }
         onCreate(inputs, { dnc });
+        onClose();
       } else {
         const res = await fetch("/api/opportunity/import", {
           method: "POST",
@@ -92,24 +121,28 @@ export function NewCaseModal({
             "This opportunity has no files in Violation Screenshots or Violation Audio Files.",
           );
         }
-        const inputs = await Promise.all(
-          data.files.map(async (file): Promise<NewCaseInput> => {
-            const download = await fetch(
-              `/api/opportunity/file?url=${encodeURIComponent(file.url)}`,
-            );
-            if (!download.ok) {
-              throw new Error(`Could not download ${file.name}.`);
-            }
-            return { blob: await download.blob(), name: file.name, kind: file.kind };
-          }),
-        );
-        onCreate(inputs, {
-          dnc,
-          name: data.opportunity.name,
-          opportunityId: data.opportunity.id,
-        });
+        if (data.existingReport) {
+          // The agent already ran for this opportunity — ask before re-running.
+          setPendingImport(data);
+          return;
+        }
+        await launchImport(data);
       }
-      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not start the case.");
+    } finally {
+      busyRef.current = false;
+      setBusy(false);
+    }
+  }
+
+  async function confirmRerun() {
+    if (!pendingImport) return;
+    setError(null);
+    busyRef.current = true;
+    setBusy(true);
+    try {
+      await launchImport(pendingImport);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not start the case.");
     } finally {
@@ -130,6 +163,49 @@ export function NewCaseModal({
         className="flex w-full max-w-md flex-col gap-5 rounded-xl border border-zinc-200 bg-white p-6 shadow-xl dark:border-zinc-800 dark:bg-zinc-950"
         onClick={(event) => event.stopPropagation()}
       >
+        {pendingImport ? (
+          <>
+            <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">
+              Run the agent again?
+            </h2>
+            <p className="text-sm text-zinc-600 dark:text-zinc-300">
+              The agent already searched for this opportunity
+              {pendingImport.existingReport?.dateAdded &&
+                ` (report saved ${new Date(
+                  pendingImport.existingReport.dateAdded,
+                ).toLocaleDateString()})`}
+              , want to run it again? Re-running replaces the saved &ldquo;AI
+              Intake Report&rdquo; note.
+            </p>
+            {error && (
+              <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-400">
+                {error}
+              </p>
+            )}
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setPendingImport(null);
+                  setError(null);
+                }}
+                disabled={busy}
+                className="rounded-lg px-4 py-2 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-100 disabled:opacity-50 dark:text-zinc-300 dark:hover:bg-zinc-900"
+              >
+                No
+              </button>
+              <button
+                type="button"
+                onClick={() => void confirmRerun()}
+                disabled={busy}
+                className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-700 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
+              >
+                {busy ? "Fetching evidence…" : "Yes, run again"}
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
         <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">
           New case
         </h2>
@@ -246,6 +322,8 @@ export function NewCaseModal({
             {busy ? "Fetching evidence…" : "Start case"}
           </button>
         </div>
+          </>
+        )}
       </div>
     </div>
   );

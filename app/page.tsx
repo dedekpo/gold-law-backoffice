@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { amrToWavBlob, isAmr } from "@/lib/audio";
 import { formatCaseName } from "@/lib/display";
+import { buildCaseManifest, caseSummaryText } from "@/lib/export";
 import type {
   AudioForensics,
   Case,
@@ -178,6 +179,7 @@ export default function Home() {
   const extractedRef = useRef<Set<string>>(new Set());
   const identifiedRef = useRef<Set<string>>(new Set());
   const forensicsRef = useRef<Set<string>>(new Set());
+  const reportedRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     casesRef.current = cases;
@@ -424,6 +426,64 @@ export default function Home() {
       identifyDefendant(c.id);
     });
   }, [cases, identifyDefendant]);
+
+  // Persist a finished run to the GHL opportunity as its "AI Intake Report"
+  // note (fixed title), so a future run — or the coming stage-change
+  // automation — can detect the agent already processed the opportunity.
+  const saveReport = useCallback(async (caseId: string) => {
+    const c = casesRef.current.find((entry) => entry.id === caseId);
+    if (!c?.opportunityId) return;
+    setCases((prev) =>
+      prev.map((entry) =>
+        entry.id === caseId ? { ...entry, reportStatus: "saving" } : entry,
+      ),
+    );
+    try {
+      const report = caseSummaryText(buildCaseManifest(c));
+      const res = await fetch("/api/opportunity/report", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ opportunityId: c.opportunityId, report }),
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => null)) as
+          | { error?: string }
+          | null;
+        throw new Error(body?.error ?? `Saving failed: ${res.status}`);
+      }
+      setCases((prev) =>
+        prev.map((entry) =>
+          entry.id === caseId ? { ...entry, reportStatus: "done" } : entry,
+        ),
+      );
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Could not save the report note.";
+      setCases((prev) =>
+        prev.map((entry) =>
+          entry.id === caseId
+            ? { ...entry, reportStatus: "error", reportError: message }
+            : entry,
+        ),
+      );
+    }
+  }, []);
+
+  // Save the note once a GHL-imported case reaches a successful terminal state:
+  // either declined at the intake gate (terminal by design) or identification
+  // finished. Failed runs are NOT persisted — a re-run should stay possible
+  // without a confirmation prompt.
+  useEffect(() => {
+    cases.forEach((c) => {
+      if (!c.opportunityId) return;
+      if (reportedRef.current.has(c.id)) return;
+      const declined = c.screeningStatus === "done" && Boolean(c.gate?.declined);
+      const identified = c.defendantStatus === "done";
+      if (!declined && !identified) return;
+      reportedRef.current.add(c.id);
+      void saveReport(c.id);
+    });
+  }, [cases, saveReport]);
 
   // Forensic automation analysis for each audio recording. Runs off the
   // transcription (independent of evaluation/identification) so the

@@ -338,6 +338,9 @@ export type Case = {
   dnc?: DncStatus;
   /** Id of the GHL opportunity this case was imported from, when applicable. */
   opportunityId?: string;
+  /** Saving the finished run to the opportunity's "AI Intake Report" note. */
+  reportStatus?: "saving" | "done" | "error";
+  reportError?: string;
   /** Normalized facts extracted from the evidence; input to screening + scoring. */
   facts?: EvidenceFacts;
   /** Intake-level gate outcome (SOL + plausible-claim). Set by the extraction step. */

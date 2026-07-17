@@ -42,6 +42,21 @@ export function CaseDetail({
               {caseItem.dnc.florida && " Florida"}
             </p>
           )}
+          {caseItem.reportStatus === "saving" && (
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">
+              Saving the report to the GHL opportunity…
+            </p>
+          )}
+          {caseItem.reportStatus === "done" && (
+            <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400">
+              Report saved to the opportunity&rsquo;s notes
+            </p>
+          )}
+          {caseItem.reportStatus === "error" && (
+            <p className="text-xs font-medium text-red-600 dark:text-red-400">
+              Report note failed: {caseItem.reportError}
+            </p>
+          )}
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1.5">
           <CaseStatusBadge caseItem={caseItem} />
