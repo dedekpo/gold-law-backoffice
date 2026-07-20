@@ -20,8 +20,8 @@ type ImportResponse = {
   opportunity: { id: string; name: string };
   files: { url: string; name: string; mimetype: string; kind: FileKind }[];
   skipped: number;
-  /** A previous agent run's report note, when one exists on the opportunity. */
-  existingReport: { noteId: string; dateAdded: string | null } | null;
+  /** Set when the opportunity's "AI Run Status" field shows a previous run. */
+  existingRun: { status: string } | null;
 };
 
 /**
@@ -121,7 +121,7 @@ export function NewCaseModal({
             "This opportunity has no files in Violation Screenshots or Violation Audio Files.",
           );
         }
-        if (data.existingReport) {
+        if (data.existingRun) {
           // The agent already ran for this opportunity — ask before re-running.
           setPendingImport(data);
           return;
@@ -170,12 +170,10 @@ export function NewCaseModal({
             </h2>
             <p className="text-sm text-zinc-600 dark:text-zinc-300">
               The agent already searched for this opportunity
-              {pendingImport.existingReport?.dateAdded &&
-                ` (report saved ${new Date(
-                  pendingImport.existingReport.dateAdded,
-                ).toLocaleDateString()})`}
-              , want to run it again? Re-running replaces the saved &ldquo;AI
-              Intake Report&rdquo; note.
+              {pendingImport.existingRun &&
+                ` (${pendingImport.existingRun.status})`}
+              , want to run it again? Re-running overwrites the AI Intake fields
+              and the saved report PDF.
             </p>
             {error && (
               <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-400">

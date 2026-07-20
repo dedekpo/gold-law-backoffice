@@ -63,6 +63,59 @@ async function throttle(): Promise<void> {
   release();
 }
 
+/**
+ * Upload a file into a custom field's storage bucket (multipart). Returns the
+ * stored file's URL + metadata; binding it to a record is a separate PUT on
+ * that record's custom field value. Accepted formats are limited server-side
+ * (images/audio/pdf/csv/docx — zip and plain text are rejected with a 415).
+ */
+export async function ghlUploadCustomFieldFile(
+  fieldId: string,
+  file: Blob,
+  filename: string,
+): Promise<{ url: string; mimetype: string; size: number }> {
+  await throttle();
+  const form = new FormData();
+  form.append("id", fieldId);
+  form.append("maxFiles", "10");
+  form.append("file", file, filename);
+  const res = await fetch(`${GHL_BASE_URL}/locations/${ghlLocationId()}/customFields/upload`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${ghlToken()}`,
+      Version: GHL_API_VERSION,
+      Accept: "application/json",
+    },
+    body: form,
+    cache: "no-store",
+  });
+  const text = await res.text();
+  let parsed: unknown;
+  try {
+    parsed = text ? JSON.parse(text) : undefined;
+  } catch {
+    parsed = text;
+  }
+  if (!res.ok) {
+    throw new GhlError(
+      `GHL upload to field ${fieldId} failed with ${res.status}`,
+      res.status,
+      parsed,
+    );
+  }
+  const meta = (
+    parsed as { meta?: { url?: string; mimetype?: string; size?: number }[] }
+  ).meta?.[0];
+  if (!meta?.url) {
+    throw new Error("GHL upload returned no file URL");
+  }
+  return {
+    url: meta.url,
+    mimetype: meta.mimetype ?? file.type,
+    size: meta.size ?? file.size,
+  };
+}
+
 export async function ghlFetch<T = unknown>(
   path: string,
   init: {

@@ -49,7 +49,7 @@ export function CaseDetail({
           )}
           {caseItem.reportStatus === "done" && (
             <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400">
-              Report saved to the opportunity&rsquo;s notes
+              Results saved to the opportunity&rsquo;s AI Intake fields
             </p>
           )}
           {caseItem.reportStatus === "error" && (

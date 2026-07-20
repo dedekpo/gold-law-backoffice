@@ -4,6 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { amrToWavBlob, isAmr } from "@/lib/audio";
 import { formatCaseName } from "@/lib/display";
 import { buildCaseManifest, caseSummaryText } from "@/lib/export";
+import { buildAiFieldValues } from "@/lib/opportunity-fields";
+import { buildReportPdf } from "@/lib/report-pdf";
 import type {
   AudioForensics,
   Case,
@@ -427,9 +429,10 @@ export default function Home() {
     });
   }, [cases, identifyDefendant]);
 
-  // Persist a finished run to the GHL opportunity as its "AI Intake Report"
-  // note (fixed title), so a future run — or the coming stage-change
-  // automation — can detect the agent already processed the opportunity.
+  // Persist a finished run to the GHL opportunity's "AI Intake" custom fields
+  // (aggregated skim values + the full PDF report). GHL is the run database:
+  // a non-empty "AI Run Status" field is how a future run — or the coming
+  // stage-change automation — knows the opportunity was already processed.
   const saveReport = useCallback(async (caseId: string) => {
     const c = casesRef.current.find((entry) => entry.id === caseId);
     if (!c?.opportunityId) return;
@@ -440,10 +443,18 @@ export default function Home() {
     );
     try {
       const report = caseSummaryText(buildCaseManifest(c));
+      const form = new FormData();
+      form.append(
+        "payload",
+        JSON.stringify({
+          opportunityId: c.opportunityId,
+          values: buildAiFieldValues(c),
+        }),
+      );
+      form.append("report", buildReportPdf(report), "AI Intake Report.pdf");
       const res = await fetch("/api/opportunity/report", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ opportunityId: c.opportunityId, report }),
+        body: form,
       });
       if (!res.ok) {
         const body = (await res.json().catch(() => null)) as
