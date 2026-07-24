@@ -1,18 +1,22 @@
 import { z } from "zod";
+import { dncUnavailable, lookupDnc } from "@/lib/dnc";
 import { GhlError, ghlFetch, ghlLocationId } from "@/lib/ghl";
 import { detectKind } from "@/lib/file-kind";
-import { createLogger, nextRequestId } from "@/lib/logger";
+import { type Logger, createLogger, nextRequestId } from "@/lib/logger";
 import { AI_FIELD_IDS } from "@/lib/opportunity-fields";
-import type { FileKind } from "@/lib/types";
+import type { DncCheck, FileKind } from "@/lib/types";
 
 const baseLog = createLogger("opportunity-import");
 
 /**
  * Resolve a pasted GHL opportunity URL to the case evidence attached to it.
- * Read-only: fetches the opportunity plus the location's opportunity
- * custom-field definitions, and returns the files held in the evidence
- * FILE_UPLOAD fields. The client downloads each file through
- * /api/opportunity/file and feeds it into the same pipeline as a manual upload.
+ * Read-only against GHL: fetches the opportunity, the location's opportunity
+ * custom-field definitions, and the opportunity's contact (for the client's
+ * phone number), and returns the files held in the evidence FILE_UPLOAD
+ * fields. The contact's number is checked against the DNC registries via the
+ * RealValidation API right here, so every case starts with an automated DNC
+ * result (replacing the old manual-lookup checkboxes). The client downloads
+ * each file through /api/opportunity/file and feeds it into the pipeline.
  */
 
 /** Opportunity custom fields whose uploads count as case evidence. */
@@ -57,6 +61,42 @@ function fileEntries(raw: RawCustomFieldValue): RawFileEntry[] {
     if (Array.isArray(candidate)) return candidate as RawFileEntry[];
   }
   return [];
+}
+
+/**
+ * Fetch the opportunity's contact from GHL and run their phone number through
+ * the RealValidation DNC lookup. Every failure path returns a DncCheck with
+ * `error` set rather than throwing, so an import never dies on the DNC step.
+ */
+async function checkContactDnc(
+  contactId: string | null,
+  log: Logger,
+): Promise<DncCheck> {
+  if (!contactId) {
+    return dncUnavailable("The opportunity has no contact attached.");
+  }
+  let phone: string | null = null;
+  try {
+    const res = await ghlFetch<{ contact?: { phone?: unknown } }>(
+      `/contacts/${contactId}`,
+    );
+    phone =
+      typeof res.contact?.phone === "string" && res.contact.phone.trim()
+        ? res.contact.phone.trim()
+        : null;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    log.warn("contact fetch failed", { contactId, message });
+    return dncUnavailable(
+      `Could not fetch the opportunity's contact from GHL: ${message}`,
+    );
+  }
+  if (!phone) {
+    return dncUnavailable(
+      "The opportunity's contact has no phone number on file.",
+    );
+  }
+  return lookupDnc(phone);
 }
 
 export async function POST(request: Request) {
@@ -154,6 +194,12 @@ export async function POST(request: Request) {
       }
     }
 
+    // Automated DNC check of the client's number (replaces the manual
+    // checkboxes). Best-effort: a missing contact/phone or a registry failure
+    // becomes a DncCheck with `error` set, so the case still starts and
+    // Screen 04 reports the DNC status as unverified.
+    const dnc = await checkContactDnc(opportunity.contactId ?? null, log);
+
     // A previous agent run leaves the "AI Run Status" custom field non-empty —
     // GHL is the run database. Report it so the UI can ask before re-running.
     const statusField = (opportunity.customFields ?? []).find(
@@ -174,6 +220,9 @@ export async function POST(request: Request) {
       files: files.length,
       skipped,
       existingRun: existingRun?.status ?? "none",
+      dnc: dnc.error
+        ? `unavailable (${dnc.error})`
+        : `national=${dnc.national} state=${dnc.state} litigator=${dnc.litigator}`,
     });
 
     return Response.json({
@@ -186,6 +235,7 @@ export async function POST(request: Request) {
       files,
       skipped,
       existingRun,
+      dnc,
     });
   } catch (err) {
     if (err instanceof GhlError && err.status === 404) {

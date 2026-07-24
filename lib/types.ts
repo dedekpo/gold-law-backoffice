@@ -157,18 +157,34 @@ export type ScreenId =
   | "quiet_hours"
   | "dnc_registry";
 
+/** One registry flag from the DNC lookup: Y → yes, N → no, "?" / failure → unknown. */
+export type DncFlag = "yes" | "no" | "unknown";
+export type DncLineType = "cell" | "landline" | "voip" | "unknown";
+
 /**
- * Operator-attested DNC registrations, ticked by an intaker AFTER a manual
- * lookup on the registry sites confirmed the client's number. Unchecked means
- * "not confirmed" — either nobody looked or the lookup came back negative —
- * and keeps the screen in its unverified state; it never means a verified
- * non-registration. Interim input until the registry API check lands.
+ * Automated DNC registry check of the client's phone number, run through the
+ * RealPhoneValidation DNC Lookup API when a case is created from a GHL
+ * opportunity. Replaces the old operator-attested checkboxes. The API takes
+ * only the phone number — there is no state input parameter; `state` reports
+ * the DNC list of the NUMBER'S OWN state (for the firm's Florida clients,
+ * the Florida DNC — Claim Tier 2). `national` is the federal registry
+ * (Claim Tier 4, needs ≥2 telemarketing contacts). A "no" is a verified
+ * non-registration; "unknown" means the registry could not be consulted.
  */
-export type DncStatus = {
-  /** National DNC registry (federal — Claim Tier 4, needs ≥2 telemarketing contacts). */
-  national: boolean;
-  /** Florida DNC list (Claim Tier 2, a single telemarketing contact suffices). */
-  florida: boolean;
+export type DncCheck = {
+  /** The 10-digit number that was checked; empty when none was available. */
+  phone: string;
+  national: DncFlag;
+  state: DncFlag;
+  /** Direct Marketing Association list — informational only, not a claim. */
+  dma: DncFlag;
+  /** The number's owner is a known TCPA litigator — client intel, not a claim. */
+  litigator: DncFlag;
+  lineType: DncLineType;
+  /** ISO timestamp of the lookup. */
+  checkedAt: string;
+  /** Set when the lookup could not run or failed; every flag stays "unknown". */
+  error?: string;
 };
 
 /** Result of one of the four screens for one company (screening-spec §4). */
@@ -334,8 +350,8 @@ export type Case = {
   /** When processing reached a terminal state (ms epoch); freezes the clock. */
   completedAt?: number;
   files: CaseFile[];
-  /** Operator-attested DNC registrations captured when the case was created. */
-  dnc?: DncStatus;
+  /** Automated DNC registry lookup of the client's number, run at case creation. */
+  dnc?: DncCheck;
   /** Id of the GHL opportunity this case was imported from, when applicable. */
   opportunityId?: string;
   /** Saving the finished run to the opportunity's "AI Intake Report" note. */

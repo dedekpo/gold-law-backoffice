@@ -1,20 +1,18 @@
 "use client";
 
-import { useEffect, useRef, useState, type ChangeEvent } from "react";
-import { detectKind } from "@/lib/file-kind";
-import type { DncStatus, FileKind } from "@/lib/types";
+import { useEffect, useRef, useState } from "react";
+import type { DncCheck, FileKind } from "@/lib/types";
 
-/** One piece of evidence ready to enter the pipeline (either source). */
+/** One piece of evidence ready to enter the pipeline. */
 export type NewCaseInput = { blob: Blob; name: string; kind: FileKind };
 
 export type NewCaseMeta = {
-  dnc: DncStatus;
+  /** Automated DNC lookup of the client's number, run by the import route. */
+  dnc?: DncCheck;
   /** Case display name; defaults to the timestamp name when absent. */
   name?: string;
   opportunityId?: string;
 };
-
-type Source = "upload" | "ghl";
 
 type ImportResponse = {
   opportunity: { id: string; name: string };
@@ -22,13 +20,16 @@ type ImportResponse = {
   skipped: number;
   /** Set when the opportunity's "AI Run Status" field shows a previous run. */
   existingRun: { status: string } | null;
+  /** Automated DNC registry check of the opportunity contact's number. */
+  dnc: DncCheck;
 };
 
 /**
- * Case-creation dialog: evidence comes from a manual file upload or from the
- * files attached to a pasted GHL opportunity URL, plus the intaker's manual
- * DNC-lookup attestations. Produces the same inputs either way, so the
- * downstream pipeline doesn't know or care where the evidence came from.
+ * Case-creation dialog: paste a GHL opportunity URL and the evidence attached
+ * to it (plus the contact's automated DNC lookup) enters the pipeline. The old
+ * manual file upload and the operator-attested DNC checkboxes are gone — the
+ * opportunity is the single source, and the DNC registries are checked through
+ * the RealValidation API on the server.
  */
 export function NewCaseModal({
   onClose,
@@ -37,11 +38,7 @@ export function NewCaseModal({
   onClose: () => void;
   onCreate: (inputs: NewCaseInput[], meta: NewCaseMeta) => void;
 }) {
-  const [source, setSource] = useState<Source>("upload");
-  const [files, setFiles] = useState<File[]>([]);
   const [url, setUrl] = useState("");
-  const [dncNational, setDncNational] = useState(false);
-  const [dncFlorida, setDncFlorida] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Import held for confirmation because the agent already ran (a report note
@@ -59,13 +56,6 @@ export function NewCaseModal({
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  function handleFiles(event: ChangeEvent<HTMLInputElement>) {
-    setError(null);
-    setFiles(Array.from(event.target.files ?? []));
-  }
-
-  const dnc: DncStatus = { national: dncNational, florida: dncFlorida };
-
   /** Download an import's evidence and hand the case off to the pipeline. */
   async function launchImport(data: ImportResponse) {
     const inputs = await Promise.all(
@@ -80,7 +70,7 @@ export function NewCaseModal({
       }),
     );
     onCreate(inputs, {
-      dnc,
+      dnc: data.dnc,
       name: data.opportunity.name,
       opportunityId: data.opportunity.id,
     });
@@ -92,42 +82,28 @@ export function NewCaseModal({
     busyRef.current = true;
     setBusy(true);
     try {
-      if (source === "upload") {
-        const inputs = files
-          .map((file) => {
-            const kind = detectKind(file.type, file.name);
-            return kind ? { blob: file as Blob, name: file.name, kind } : null;
-          })
-          .filter((input): input is NewCaseInput => input !== null);
-        if (inputs.length === 0) {
-          throw new Error("None of the selected files are audio or images.");
-        }
-        onCreate(inputs, { dnc });
-        onClose();
-      } else {
-        const res = await fetch("/api/opportunity/import", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ url: url.trim() }),
-        });
-        const data = (await res.json().catch(() => null)) as
-          | (ImportResponse & { error?: string })
-          | null;
-        if (!res.ok || !data) {
-          throw new Error(data?.error ?? `Import failed: ${res.status}`);
-        }
-        if (data.files.length === 0) {
-          throw new Error(
-            "This opportunity has no files in Violation Screenshots or Violation Audio Files.",
-          );
-        }
-        if (data.existingRun) {
-          // The agent already ran for this opportunity — ask before re-running.
-          setPendingImport(data);
-          return;
-        }
-        await launchImport(data);
+      const res = await fetch("/api/opportunity/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: url.trim() }),
+      });
+      const data = (await res.json().catch(() => null)) as
+        | (ImportResponse & { error?: string })
+        | null;
+      if (!res.ok || !data) {
+        throw new Error(data?.error ?? `Import failed: ${res.status}`);
       }
+      if (data.files.length === 0) {
+        throw new Error(
+          "This opportunity has no files in Violation Screenshots or Violation Audio Files.",
+        );
+      }
+      if (data.existingRun) {
+        // The agent already ran for this opportunity — ask before re-running.
+        setPendingImport(data);
+        return;
+      }
+      await launchImport(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not start the case.");
     } finally {
@@ -151,8 +127,7 @@ export function NewCaseModal({
     }
   }
 
-  const canStart =
-    !busy && (source === "upload" ? files.length > 0 : url.trim().length > 0);
+  const canStart = !busy && url.trim().length > 0;
 
   return (
     <div
@@ -204,122 +179,53 @@ export function NewCaseModal({
           </>
         ) : (
           <>
-        <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">
-          New case
-        </h2>
+            <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">
+              New case
+            </h2>
 
-        <div className="grid grid-cols-2 gap-2">
-          {(
-            [
-              ["upload", "Upload files"],
-              ["ghl", "GHL opportunity"],
-            ] as const
-          ).map(([value, label]) => (
-            <button
-              key={value}
-              type="button"
-              onClick={() => {
-                setSource(value);
-                setError(null);
-              }}
-              className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
-                source === value
-                  ? "border-zinc-900 bg-zinc-900 text-white dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-900"
-                  : "border-zinc-300 text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-900"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+            <div className="flex flex-col gap-1.5">
+              <input
+                type="url"
+                value={url}
+                onChange={(event) => {
+                  setUrl(event.target.value);
+                  setError(null);
+                }}
+                placeholder="https://login.amicus-pro.com/v2/location/…/opportunities/…"
+                className="w-full rounded-lg border border-zinc-300 bg-transparent px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none dark:border-zinc-700 dark:text-zinc-100 dark:placeholder:text-zinc-600"
+              />
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                Evidence is pulled from the opportunity&rsquo;s Violation
+                Screenshots and Violation Audio Files fields. The client&rsquo;s
+                number is checked against the National and Florida DNC
+                registries automatically.
+              </p>
+            </div>
 
-        {source === "upload" ? (
-          <label className="flex cursor-pointer flex-col items-center gap-1 rounded-lg border border-dashed border-zinc-300 px-4 py-6 text-center text-sm text-zinc-600 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900">
-            {files.length > 0
-              ? `${files.length} file${files.length === 1 ? "" : "s"} selected`
-              : "Choose audio or image files"}
-            <span className="text-xs text-zinc-400 dark:text-zinc-500">
-              Voicemails and screenshots of the violations
-            </span>
-            <input
-              type="file"
-              accept="audio/*,image/*"
-              multiple
-              onChange={handleFiles}
-              className="hidden"
-            />
-          </label>
-        ) : (
-          <div className="flex flex-col gap-1.5">
-            <input
-              type="url"
-              value={url}
-              onChange={(event) => {
-                setUrl(event.target.value);
-                setError(null);
-              }}
-              placeholder="https://login.amicus-pro.com/v2/location/…/opportunities/…"
-              className="w-full rounded-lg border border-zinc-300 bg-transparent px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none dark:border-zinc-700 dark:text-zinc-100 dark:placeholder:text-zinc-600"
-            />
-            <p className="text-xs text-zinc-500 dark:text-zinc-400">
-              Evidence is pulled from the opportunity&rsquo;s Violation
-              Screenshots and Violation Audio Files fields.
-            </p>
-          </div>
-        )}
+            {error && (
+              <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-400">
+                {error}
+              </p>
+            )}
 
-        <fieldset className="flex flex-col gap-2 rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
-          <legend className="px-1 text-xs font-medium text-zinc-500 dark:text-zinc-400">
-            DNC registry — manual lookup
-          </legend>
-          <label className="flex items-start gap-2 text-sm text-zinc-700 dark:text-zinc-200">
-            <input
-              type="checkbox"
-              checked={dncNational}
-              onChange={(event) => setDncNational(event.target.checked)}
-              className="mt-0.5"
-            />
-            Client is registered on the National DNC
-          </label>
-          <label className="flex items-start gap-2 text-sm text-zinc-700 dark:text-zinc-200">
-            <input
-              type="checkbox"
-              checked={dncFlorida}
-              onChange={(event) => setDncFlorida(event.target.checked)}
-              className="mt-0.5"
-            />
-            Client is registered on the Florida DNC
-          </label>
-          <p className="text-xs text-zinc-400 dark:text-zinc-500">
-            Tick only after checking the registry. Left unchecked, DNC status is
-            treated as unverified.
-          </p>
-        </fieldset>
-
-        {error && (
-          <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-400">
-            {error}
-          </p>
-        )}
-
-        <div className="flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={busy}
-            className="rounded-lg px-4 py-2 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-100 disabled:opacity-50 dark:text-zinc-300 dark:hover:bg-zinc-900"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={() => void start()}
-            disabled={!canStart}
-            className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-700 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
-          >
-            {busy ? "Fetching evidence…" : "Start case"}
-          </button>
-        </div>
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={onClose}
+                disabled={busy}
+                className="rounded-lg px-4 py-2 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-100 disabled:opacity-50 dark:text-zinc-300 dark:hover:bg-zinc-900"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void start()}
+                disabled={!canStart}
+                className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-700 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
+              >
+                {busy ? "Fetching evidence…" : "Start case"}
+              </button>
+            </div>
           </>
         )}
       </div>

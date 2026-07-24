@@ -10,7 +10,7 @@ import {
 } from "@/lib/screening";
 import type {
   ConsentSignal,
-  DncStatus,
+  DncCheck,
   ExtractedContact,
   ScreenResult,
   Scorecard,
@@ -148,12 +148,12 @@ function theoriesFromScreens(screens: ScreenResult[]): ClaimTheory[] {
 /**
  * Assess one company against its attributed evidence: screens, kill check, track,
  * and (for the TCPA track) the deterministic scorecard. `intake.dnc` carries the
- * operator-attested DNC registrations (case-level, applies to every company).
+ * automated DNC registry lookup result (case-level, applies to every company).
  */
 export function assessCompany(
   company: ScorableCompany,
   contacts: ExtractedContact[],
-  intake: { dnc?: DncStatus } = {},
+  intake: { dnc?: DncCheck } = {},
 ): CompanyAssessment {
   const screens = runScreens(contacts, intake);
   const killCheck = checkKillConditions(contacts);

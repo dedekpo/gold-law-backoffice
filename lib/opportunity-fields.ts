@@ -175,14 +175,12 @@ export function buildAiFieldValues(caseItem: Case): AiFieldValues {
   const notes: string[] = [];
   const dnc = caseItem.dnc;
   notes.push(
-    dnc?.national || dnc?.florida
-      ? `DNC registrations attested by manual lookup: ${[
-          dnc.national && "National",
-          dnc.florida && "Florida",
-        ]
-          .filter(Boolean)
-          .join(", ")}.`
-      : "DNC registrations: not confirmed (no manual lookup attested).",
+    !dnc
+      ? "DNC lookup: not run."
+      : dnc.error
+        ? `DNC lookup: unavailable — ${dnc.error}`
+        : `DNC lookup (RealValidation, ${dnc.phone}): National=${dnc.national}, ` +
+          `State/FL=${dnc.state}, Litigator=${dnc.litigator}, Line=${dnc.lineType}.`,
   );
   if (gate) {
     if (gate.declined) {

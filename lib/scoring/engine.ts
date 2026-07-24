@@ -235,10 +235,11 @@ function bandFor(score: number): Band {
 
 function buildUnknowns(input: ScoreInput): string[] {
   const unknowns = new Set<string>(input.unknowns ?? []);
-  // DNC theories present but unverified (MVP) — would raise Claim Type once the API confirms.
+  // DNC theories present but unverified — the registry lookup failed or was
+  // inconclusive; a confirmed registration would raise Claim Type.
   if (input.theories.some((t) => !t.verified && (t.tier === 2 || t.tier === 4))) {
     unknowns.add(
-      "DNC status unverified — pending registry check (could raise Claim Type).",
+      "DNC status unverified — the registry lookup failed or was inconclusive (could raise Claim Type).",
     );
   }
   // Volume is only what the evidence shows; the client may have more.

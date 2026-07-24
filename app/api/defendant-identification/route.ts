@@ -396,6 +396,19 @@ const contactSchema = z.object({
   contentSummary: z.string(),
 });
 
+// Mirrors DncCheck (lib/types) — the automated registry lookup result.
+const dncFlagSchema = z.enum(["yes", "no", "unknown"]);
+const dncCheckSchema = z.object({
+  phone: z.string(),
+  national: dncFlagSchema,
+  state: dncFlagSchema,
+  dma: dncFlagSchema,
+  litigator: dncFlagSchema,
+  lineType: z.enum(["cell", "landline", "voip", "unknown"]),
+  checkedAt: z.string(),
+  error: z.string().optional(),
+});
+
 const requestSchema = z.object({
   files: z.array(fileSchema).min(1),
   facts: z
@@ -404,14 +417,10 @@ const requestSchema = z.object({
       notes: z.array(z.string()).optional(),
     })
     .optional(),
-  // Operator-attested DNC registrations (manual registry lookups by an intaker).
-  // Case-level: feeds Screen 04 for every identified company.
-  dnc: z
-    .object({
-      national: z.boolean(),
-      florida: z.boolean(),
-    })
-    .optional(),
+  // Automated DNC lookup of the client's number (RealValidation API, run at
+  // import). Case-level: feeds Screen 04 for every identified company and the
+  // agent's "CLIENT DNC CHECK" context block.
+  dnc: dncCheckSchema.optional(),
 });
 
 // The investigation can run for ~10 minutes. Rather than hold one HTTP request
@@ -480,7 +489,11 @@ async function runInvestigation(
     kinds: files.map((f) => f.kind).join(","),
     hasFacts: Boolean(facts),
     contacts: facts?.contacts.length ?? 0,
-    dnc: dnc ? `national=${dnc.national} florida=${dnc.florida}` : "none",
+    dnc: dnc
+      ? dnc.error
+        ? `unavailable (${dnc.error})`
+        : `national=${dnc.national} state=${dnc.state} litigator=${dnc.litigator}`
+      : "none",
   });
 
   const fileBlocks = files
@@ -491,9 +504,26 @@ async function runInvestigation(
     })
     .join("\n\n---\n\n");
 
+  // The client's DNC posture, checked once at import — handed to the agent as
+  // ground truth so it never spends a step re-checking the client's number.
+  const dncBlock = dnc
+    ? `\n\n--- CLIENT DNC CHECK (RealValidation registry lookup of the client's number${
+        dnc.phone ? ` ${dnc.phone}` : ""
+      } — treat as authoritative; do not re-check this number) ---\n${
+        dnc.error
+          ? `The lookup could not run: ${dnc.error} DNC status is UNVERIFIED.`
+          : [
+              `National DNC registry: ${dnc.national}`,
+              `State DNC list (the number's home state — Florida for FL numbers): ${dnc.state}`,
+              `Known TCPA litigator: ${dnc.litigator}`,
+              `Line type: ${dnc.lineType}`,
+            ].join("\n")
+      }`
+    : "";
+
   const prompt = `The case below contains ${files.length} file${
     files.length === 1 ? "" : "s"
-  }. Identify the company (or companies) behind the phone number(s) or company name(s) in this evidence, following the SOP.\n\n${fileBlocks}`;
+  }. Identify the company (or companies) behind the phone number(s) or company name(s) in this evidence, following the SOP.\n\n${fileBlocks}${dncBlock}`;
 
   try {
     const agent = await getDefendantAgent();

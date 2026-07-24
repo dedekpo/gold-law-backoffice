@@ -356,7 +356,8 @@ export default function Home() {
           // Normalized facts from the extraction pass, used to screen + score
           // each identified company.
           facts: c.facts,
-          // Operator-attested DNC registrations from case creation (Screen 04).
+          // Automated DNC lookup result from case creation (Screen 04 + the
+          // agent's "CLIENT DNC CHECK" context block).
           dnc: c.dnc,
         }),
       });
@@ -672,9 +673,10 @@ export default function Home() {
       ) : (
         <div className="flex flex-1 items-center justify-center p-8 text-center">
           <p className="max-w-sm text-sm text-zinc-500 dark:text-zinc-400">
-            Open a case from uploaded audio/image files or from a GHL
-            opportunity URL. Each case is evaluated against the TCPA rubric,
-            then investigated to identify the company behind it.
+            Open a case from a GHL opportunity URL. Its evidence files are
+            evaluated against the TCPA rubric, the client&rsquo;s number is
+            checked against the DNC registries, and the company behind the
+            violation is investigated.
           </p>
         </div>
       )}

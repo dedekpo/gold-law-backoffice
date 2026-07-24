@@ -34,14 +34,25 @@ export function CaseDetail({
             {processingCount > 0 && ` · ${processingCount} processing`}
             {errorCount > 0 && ` · ${errorCount} failed`}
           </p>
-          {(caseItem.dnc?.national || caseItem.dnc?.florida) && (
-            <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400">
-              DNC confirmed by manual lookup:
-              {caseItem.dnc.national && " National"}
-              {caseItem.dnc.national && caseItem.dnc.florida && " ·"}
-              {caseItem.dnc.florida && " Florida"}
-            </p>
-          )}
+          {caseItem.dnc &&
+            (caseItem.dnc.error ? (
+              <p className="text-xs font-medium text-amber-600 dark:text-amber-400">
+                DNC lookup unavailable: {caseItem.dnc.error}
+              </p>
+            ) : (
+              <p
+                className={`text-xs font-medium ${
+                  caseItem.dnc.national === "yes" ||
+                  caseItem.dnc.state === "yes"
+                    ? "text-emerald-600 dark:text-emerald-400"
+                    : "text-zinc-500 dark:text-zinc-400"
+                }`}
+              >
+                DNC lookup ({caseItem.dnc.phone}): National{" "}
+                {caseItem.dnc.national} · State/FL {caseItem.dnc.state}
+                {caseItem.dnc.litigator === "yes" && " · ⚠ known litigator"}
+              </p>
+            ))}
           {caseItem.reportStatus === "saving" && (
             <p className="text-xs text-zinc-500 dark:text-zinc-400">
               Saving the report to the GHL opportunity…

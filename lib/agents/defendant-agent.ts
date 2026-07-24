@@ -3,7 +3,12 @@ import { join } from "node:path";
 import { Output, ToolLoopAgent, generateText, stepCountIs } from "ai";
 import { z } from "zod";
 import { MODELS } from "@/lib/provider";
-import { fetchPageTool, sosLookupTool, webSearchTool } from "./defendant-tools";
+import {
+  dncLookupTool,
+  fetchPageTool,
+  sosLookupTool,
+  webSearchTool,
+} from "./defendant-tools";
 import { rateLimitedModel } from "./model";
 
 export const candidateSchema = z.object({
@@ -127,6 +132,14 @@ problem in a loop:
      whose address/officers corroborate your other evidence.
    - Always run \`sos_lookup\` before finishing if you have any plausible legal name — the
      official record is the most valuable output of this investigation.
+7. DNC registries. When the case context includes a "CLIENT DNC CHECK" block, the client's
+   number was already checked against the National and state Do-Not-Call registries — treat
+   that result as authoritative and do NOT re-check the same number. Use the \`dnc_lookup\`
+   tool only for a DIFFERENT consumer number that appears in the evidence (a registration
+   belongs to the person RECEIVING the calls, never to the company sending them). Weave the
+   DNC posture into your report: a National registration (with 2+ telemarketing contacts) or
+   a state/Florida registration is a DNC claim theory; a "litigator" flag on the client is
+   intake intel worth calling out.
 
 When you have finished investigating, write a concise FINAL REPORT in plain text. For EACH distinct
 company you can support with evidence, state: the brand/trade name; the exact registered legal name
@@ -171,6 +184,7 @@ const tools = {
   web_search: webSearchTool,
   fetch_page: fetchPageTool,
   sos_lookup: sosLookupTool,
+  dnc_lookup: dncLookupTool,
 };
 
 async function loadSop(): Promise<string> {

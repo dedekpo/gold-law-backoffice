@@ -1,5 +1,6 @@
 import { generateText, tool } from "ai";
 import { z } from "zod";
+import { lookupDnc } from "@/lib/dnc";
 import { createLogger } from "@/lib/logger";
 import { MODELS, anthropic } from "@/lib/provider";
 import { isRateLimitError } from "@/lib/rate-limit";
@@ -146,6 +147,30 @@ export const fetchPageTool = tool({
       return { url, error: message };
     }
   },
+});
+
+/**
+ * DNC registry check via the RealPhoneValidation DNC Lookup API. The client's
+ * number is normally pre-checked by the route and given to the agent in its
+ * prompt; the tool lets the agent check any OTHER consumer number that turns up
+ * in the evidence. Failures are returned (never thrown) so a registry outage
+ * can't abort an investigation.
+ */
+export const dncLookupTool = tool({
+  description:
+    "Check a US phone number against the Do-Not-Call registries (RealValidation DNC API). " +
+    "Returns: national (federal DNC registry), state (the DNC list of the NUMBER'S OWN " +
+    "state — Florida for Florida numbers; the API accepts no state parameter), litigator " +
+    "(the number's owner is a known TCPA litigator), and lineType (cell/landline/voip). " +
+    "Each flag is yes/no/unknown. Use it on a CONSUMER'S number (usually the client's, " +
+    "which is typically pre-checked in your prompt) — a DNC registration belongs to the " +
+    "person receiving the calls, not the company sending them.",
+  inputSchema: z.object({
+    phone: z
+      .string()
+      .describe("US phone number in any format; normalized to 10 digits."),
+  }),
+  execute: ({ phone }) => lookupDnc(phone),
 });
 
 // --- OpenSOSData: real-time Secretary of State entity lookups -----------------
