@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { amrToWavBlob, isAmr } from "@/lib/audio";
 import { formatCaseName } from "@/lib/display";
 import { buildCaseManifest, caseSummaryText } from "@/lib/export";
+import { downscaleImage } from "@/lib/image-resize";
 import { buildAiFieldValues } from "@/lib/opportunity-fields";
 import { buildReportPdf } from "@/lib/report-pdf";
 import type {
@@ -31,10 +32,28 @@ function randomId(): string {
   return `${Date.now()}-${Math.random()}`;
 }
 
+/** Base64-encode a blob, keeping the media type the browser reports for it. */
+async function blobToData(
+  blob: Blob,
+  fallbackType: string,
+): Promise<{ data: string; mediaType: string } | null> {
+  const dataUrl = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
+  const comma = dataUrl.indexOf(",");
+  const data = dataUrl.slice(comma + 1);
+  const mediaType =
+    dataUrl.slice(5, dataUrl.indexOf(";")) || blob.type || fallbackType;
+  return data ? { data, mediaType } : null;
+}
+
 /**
  * Read a file (from its object URL) back as base64 so it can be sent to a model
- * directly — the original screenshot for the evaluator, or the audio bytes for
- * forensic analysis. Returns null on failure so the caller can fall back.
+ * directly — the audio bytes for forensic analysis. Returns null on failure so
+ * the caller can fall back.
  */
 async function dataFromUrl(
   url: string,
@@ -42,21 +61,41 @@ async function dataFromUrl(
 ): Promise<{ data: string; mediaType: string } | null> {
   try {
     const blob = await fetch(url).then((r) => r.blob());
-    const dataUrl = await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = () => reject(reader.error);
-      reader.readAsDataURL(blob);
-    });
-    const comma = dataUrl.indexOf(",");
-    const data = dataUrl.slice(comma + 1);
-    const mediaType =
-      dataUrl.slice(5, dataUrl.indexOf(";")) || blob.type || fallbackType;
-    return data ? { data, mediaType } : null;
+    return await blobToData(blob, fallbackType);
   } catch {
     return null;
   }
 }
+
+/**
+ * Same, for a screenshot headed to the screen extraction — downscaled first so
+ * a case with more than 20 of them isn't rejected outright by the model's
+ * many-image dimension cap (see lib/image-resize.ts). The full-resolution
+ * original is untouched: it is what /api/image-description already read, and
+ * what the evidence export ships.
+ */
+async function imageDataFromUrl(
+  url: string,
+): Promise<{ data: string; mediaType: string } | null> {
+  try {
+    const blob = await fetch(url).then((r) => r.blob());
+    return await blobToData(await downscaleImage(blob), "image/png");
+  } catch {
+    return null;
+  }
+}
+
+/** One evidence file as /api/extract-screen expects it. */
+type ExtractFilePayload = {
+  kind: FileKind;
+  name: string;
+  text: string;
+  image?: { data: string; mediaType: string };
+  forensics?: {
+    is_likely_prerecorded: boolean;
+    automated_likelihood: number;
+  };
+};
 
 /** Immutably patch a single file inside a case. */
 function patchFile(
@@ -227,32 +266,29 @@ export default function Home() {
     );
 
     try {
-      // Images: attach the original bytes for native vision. Audio: pass the
-      // forensic hint when it's already in, so isPrerecorded is grounded.
-      const filesPayload = await Promise.all(
-        successful.map(async (file) => {
-          const base: {
-            kind: FileKind;
-            name: string;
-            text: string;
-            image?: { data: string; mediaType: string };
-            forensics?: {
-              is_likely_prerecorded: boolean;
-              automated_likelihood: number;
-            };
-          } = { kind: file.kind, name: file.name, text: file.text! };
-          if (file.kind === "image") {
-            const image = await dataFromUrl(file.url, "image/png");
-            if (image) base.image = image;
-          } else if (file.forensics) {
-            base.forensics = {
-              is_likely_prerecorded: file.forensics.is_likely_prerecorded,
-              automated_likelihood: file.forensics.automated_likelihood,
-            };
-          }
-          return base;
-        }),
-      );
+      // Images: attach the (downscaled) screenshot bytes for native vision.
+      // Audio: pass the forensic hint when it's already in, so isPrerecorded is
+      // grounded. Built one file at a time on purpose — decoding a couple of
+      // dozen full-resolution screenshots concurrently spikes memory hard
+      // enough to kill the tab.
+      const filesPayload: ExtractFilePayload[] = [];
+      for (const file of successful) {
+        const base: ExtractFilePayload = {
+          kind: file.kind,
+          name: file.name,
+          text: file.text!,
+        };
+        if (file.kind === "image") {
+          const image = await imageDataFromUrl(file.url);
+          if (image) base.image = image;
+        } else if (file.forensics) {
+          base.forensics = {
+            is_likely_prerecorded: file.forensics.is_likely_prerecorded,
+            automated_likelihood: file.forensics.automated_likelihood,
+          };
+        }
+        filesPayload.push(base);
+      }
 
       // Start the extraction as a background job. The POST returns a job id in
       // well under a second, so a proxy timeout can't cut it — a large batch

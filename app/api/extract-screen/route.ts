@@ -248,6 +248,11 @@ export async function POST(request: Request) {
   log.info("request received", {
     files: files.length,
     kinds: files.map((f) => f.kind).join(","),
+    // Anthropic drops the per-image dimension cap from 8000px to 2000px once a
+    // request carries more than 20 images, so this count decides whether the
+    // request is subject to the stricter limit. Logged to make a "many-image"
+    // rejection immediately explainable.
+    images: files.filter((f) => f.image).length,
   });
 
   const jobId = startJob(() => runExtraction(files, log), {
