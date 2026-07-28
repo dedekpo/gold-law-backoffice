@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { dncUnavailable, lookupDnc } from "@/lib/dnc";
+import { syncContactDnc } from "@/lib/contact-dnc";
+import { dncUnavailable } from "@/lib/dnc";
 import { GhlError, ghlFetch, ghlLocationId } from "@/lib/ghl";
 import { detectKind } from "@/lib/file-kind";
 import { type Logger, createLogger, nextRequestId } from "@/lib/logger";
@@ -10,13 +11,15 @@ const baseLog = createLogger("opportunity-import");
 
 /**
  * Resolve a pasted GHL opportunity URL to the case evidence attached to it.
- * Read-only against GHL: fetches the opportunity, the location's opportunity
- * custom-field definitions, and the opportunity's contact (for the client's
- * phone number), and returns the files held in the evidence FILE_UPLOAD
- * fields. The contact's number is checked against the DNC registries via the
- * RealValidation API right here, so every case starts with an automated DNC
- * result (replacing the old manual-lookup checkboxes). The client downloads
- * each file through /api/opportunity/file and feeds it into the pipeline.
+ * Fetches the opportunity, the location's opportunity custom-field
+ * definitions, and the opportunity's contact (for the client's phone
+ * number), and returns the files held in the evidence FILE_UPLOAD fields.
+ * The contact's number is checked against the DNC registries via the
+ * RealValidation API right here, so every case starts with a fresh automated
+ * DNC result, which is also mirrored onto the contact's dropdown custom
+ * fields as a reference for intakers (the run's only GHL write). The client
+ * downloads each file through /api/opportunity/file and feeds it into the
+ * pipeline.
  */
 
 /** Opportunity custom fields whose uploads count as case evidence. */
@@ -64,9 +67,11 @@ function fileEntries(raw: RawCustomFieldValue): RawFileEntry[] {
 }
 
 /**
- * Fetch the opportunity's contact from GHL and run their phone number through
- * the RealValidation DNC lookup. Every failure path returns a DncCheck with
- * `error` set rather than throwing, so an import never dies on the DNC step.
+ * Run the opportunity's contact through the RealValidation DNC lookup and
+ * mirror the result onto the contact's dropdown custom fields (a reference
+ * for intakers — see lib/contact-dnc.ts). Every failure path returns a
+ * DncCheck with `error` set rather than throwing, so an import never dies
+ * on the DNC step.
  */
 async function checkContactDnc(
   contactId: string | null,
@@ -75,15 +80,13 @@ async function checkContactDnc(
   if (!contactId) {
     return dncUnavailable("The opportunity has no contact attached.");
   }
-  let phone: string | null = null;
   try {
-    const res = await ghlFetch<{ contact?: { phone?: unknown } }>(
-      `/contacts/${contactId}`,
-    );
-    phone =
-      typeof res.contact?.phone === "string" && res.contact.phone.trim()
-        ? res.contact.phone.trim()
-        : null;
+    const { dnc, changedFields, writeError } = await syncContactDnc(contactId);
+    if (writeError) {
+      log.warn("contact dnc write-back failed", { contactId, writeError });
+    }
+    log.info("contact dnc synced", { contactId, changedFields });
+    return dnc;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     log.warn("contact fetch failed", { contactId, message });
@@ -91,12 +94,6 @@ async function checkContactDnc(
       `Could not fetch the opportunity's contact from GHL: ${message}`,
     );
   }
-  if (!phone) {
-    return dncUnavailable(
-      "The opportunity's contact has no phone number on file.",
-    );
-  }
-  return lookupDnc(phone);
 }
 
 export async function POST(request: Request) {
