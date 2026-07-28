@@ -50,7 +50,7 @@ export async function POST(request: Request) {
     log.error("GO_HIGH_LEVEL_WEBHOOK_SECRET is not set");
     return Response.json(
       { error: "Webhook secret is not configured on the server" },
-      { status: 503 },
+      { status: 503 }
     );
   }
   if (request.headers.get("x-webhook-secret") !== secret) {
@@ -72,7 +72,7 @@ export async function POST(request: Request) {
         error:
           'Missing phone or contact id — send { "phone-raw": "{{contact.phone}}", "contact-id": "{{contact.id}}" }',
       },
-      { status: 400 },
+      { status: 400 }
     );
   }
 
@@ -86,13 +86,13 @@ export async function POST(request: Request) {
       log.warn("dnc lookup unavailable", { contactId, error: dnc.error });
       return Response.json(
         { updated: false, contactId, error: dnc.error },
-        { status: 502 },
+        { status: 502 }
       );
     }
     if (writeError) {
       return Response.json(
         { updated: false, contactId, error: writeError },
-        { status: 500 },
+        { status: 500 }
       );
     }
     log.info("dnc check complete", {
@@ -114,10 +114,10 @@ export async function POST(request: Request) {
     const status = err instanceof GhlError ? err.status : undefined;
     const message = err instanceof Error ? err.message : String(err);
     log.error("contact update failed", { contactId, status, message });
-    // 404 from GHL means the id wasn't a contact (or was deleted).
+    // 404 from GHL means the id wasn't a contact (or was deleted)
     return Response.json(
       { error: message, contactId },
-      { status: status === 404 ? 404 : 500 },
+      { status: status === 404 ? 404 : 500 }
     );
   }
 }
