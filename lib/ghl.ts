@@ -116,6 +116,55 @@ export async function ghlUploadCustomFieldFile(
   };
 }
 
+/**
+ * GET a binary resource (e.g. a call recording). Same auth/throttle/retry as
+ * ghlFetch, but returns raw bytes instead of parsing JSON.
+ */
+export async function ghlFetchBinary(
+  path: string,
+): Promise<{ data: Uint8Array; contentType: string }> {
+  for (let attempt = 0; ; attempt++) {
+    await throttle();
+    const res = await fetch(`${GHL_BASE_URL}${path}`, {
+      headers: {
+        Authorization: `Bearer ${ghlToken()}`,
+        Version: GHL_API_VERSION,
+      },
+      cache: "no-store",
+    });
+    if (res.ok) {
+      return {
+        data: new Uint8Array(await res.arrayBuffer()),
+        contentType: res.headers.get("content-type") ?? "application/octet-stream",
+      };
+    }
+    const text = await res.text();
+    let parsed: unknown;
+    try {
+      parsed = text ? JSON.parse(text) : undefined;
+    } catch {
+      parsed = text;
+    }
+    if ((res.status === 429 || res.status >= 500) && attempt < MAX_RETRIES) {
+      const backoffMs = 1_000 * 2 ** attempt;
+      log.warn("retryable GHL error, backing off", {
+        method: "GET",
+        path,
+        status: res.status,
+        attempt: attempt + 1,
+        backoffMs,
+      });
+      await new Promise((resolve) => setTimeout(resolve, backoffMs));
+      continue;
+    }
+    throw new GhlError(
+      `GHL GET ${path} failed with ${res.status}`,
+      res.status,
+      parsed,
+    );
+  }
+}
+
 export async function ghlFetch<T = unknown>(
   path: string,
   init: {

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { amrToWavBlob, isAmr } from "@/lib/audio";
 import { formatCaseName } from "@/lib/display";
+import { buildCaseSnapshot } from "@/lib/case-snapshot";
 import { buildCaseManifest, caseSummaryText } from "@/lib/export";
 import { downscaleImage } from "@/lib/image-resize";
 import { buildAiFieldValues } from "@/lib/opportunity-fields";
@@ -467,8 +468,9 @@ export default function Home() {
   }, [cases, identifyDefendant]);
 
   // Persist a finished run to the GHL opportunity's "AI Intake" custom fields
-  // (aggregated skim values + the full PDF report). GHL is the run database:
-  // a non-empty "AI Run Status" field is how a future run — or the coming
+  // (aggregated skim values + the full PDF report) and, via the same request,
+  // the full structured snapshot to Firestore for the review queue. A
+  // non-empty "AI Run Status" field is how a future run — or the coming
   // stage-change automation — knows the opportunity was already processed.
   const saveReport = useCallback(async (caseId: string) => {
     const c = casesRef.current.find((entry) => entry.id === caseId);
@@ -486,6 +488,9 @@ export default function Home() {
         JSON.stringify({
           opportunityId: c.opportunityId,
           values: buildAiFieldValues(c),
+          // Structured copy of the whole run for Firestore — the review
+          // queue's data source.
+          snapshot: buildCaseSnapshot(c),
         }),
       );
       form.append("report", buildReportPdf(report), "AI Intake Report.pdf");
@@ -709,10 +714,11 @@ export default function Home() {
       ) : (
         <div className="flex flex-1 items-center justify-center p-8 text-center">
           <p className="max-w-sm text-sm text-zinc-500 dark:text-zinc-400">
-            Open a case from a GHL opportunity URL. Its evidence files are
-            evaluated against the TCPA rubric, the client&rsquo;s number is
-            checked against the DNC registries, and the company behind the
-            violation is investigated.
+            Open a case from a GHL opportunity URL or manually uploaded
+            audio/image files. The evidence is evaluated against the TCPA
+            rubric, the client&rsquo;s number is checked against the DNC
+            registries (GHL cases only), and the company behind the violation
+            is investigated.
           </p>
         </div>
       )}

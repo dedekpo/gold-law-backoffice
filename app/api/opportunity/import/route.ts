@@ -1,11 +1,14 @@
 import { z } from "zod";
 import { syncContactDnc } from "@/lib/contact-dnc";
 import { dncUnavailable } from "@/lib/dnc";
-import { GhlError, ghlFetch, ghlLocationId } from "@/lib/ghl";
-import { detectKind } from "@/lib/file-kind";
+import { GhlError, ghlLocationId } from "@/lib/ghl";
 import { type Logger, createLogger, nextRequestId } from "@/lib/logger";
+import {
+  customFieldString,
+  fetchOpportunityWithEvidence,
+} from "@/lib/opportunity-evidence";
 import { AI_FIELD_IDS } from "@/lib/opportunity-fields";
-import type { DncCheck, FileKind } from "@/lib/types";
+import type { DncCheck } from "@/lib/types";
 
 const baseLog = createLogger("opportunity-import");
 
@@ -22,49 +25,12 @@ const baseLog = createLogger("opportunity-import");
  * pipeline.
  */
 
-/** Opportunity custom fields whose uploads count as case evidence. */
-const EVIDENCE_FIELD_KEYS = [
-  "opportunity.violation_screenshots",
-  "opportunity.violation_audio_files",
-] as const;
-
 // e.g. https://login.amicus-pro.com/v2/location/{locationId}/opportunities/{id}?tab=…
 const URL_RE = /\/location\/([A-Za-z0-9]+)\/opportunities\/([A-Za-z0-9]+)/;
 
 const requestSchema = z.object({
   url: z.string().min(1),
 });
-
-type RawFileEntry = {
-  url?: unknown;
-  deleted?: unknown;
-  meta?: { name?: unknown; mimetype?: unknown; size?: unknown };
-};
-
-type RawCustomFieldValue = {
-  id?: string;
-  // The upload array's property name varies by endpoint version; probe them all.
-  fieldValue?: unknown;
-  fieldValueArray?: unknown;
-  value?: unknown;
-};
-
-export type ImportedFile = {
-  url: string;
-  name: string;
-  mimetype: string;
-  size: number | null;
-  kind: FileKind;
-  /** Short field key the file came from, e.g. "violation_screenshots". */
-  field: string;
-};
-
-function fileEntries(raw: RawCustomFieldValue): RawFileEntry[] {
-  for (const candidate of [raw.fieldValue, raw.fieldValueArray, raw.value]) {
-    if (Array.isArray(candidate)) return candidate as RawFileEntry[];
-  }
-  return [];
-}
 
 /**
  * Run the opportunity's contact through the RealValidation DNC lookup and
@@ -130,86 +96,28 @@ export async function POST(request: Request) {
   log.info("importing opportunity", { opportunityId });
 
   try {
-    const [oppRes, fieldsRes] = await Promise.all([
-      ghlFetch<{
-        opportunity?: {
-          id?: string;
-          name?: string;
-          status?: string;
-          contactId?: string;
-          customFields?: RawCustomFieldValue[];
-        };
-      }>(`/opportunities/${opportunityId}`),
-      ghlFetch<{
-        customFields?: { id: string; fieldKey: string; dataType?: string }[];
-      }>(`/locations/${ghlLocationId()}/customFields?model=opportunity`),
-    ]);
-
-    const opportunity = oppRes.opportunity;
-    if (!opportunity?.id) {
+    const result = await fetchOpportunityWithEvidence(opportunityId);
+    if (!result) {
       return Response.json(
         { error: "GHL returned no opportunity for that URL." },
         { status: 502 },
       );
     }
-
-    const evidenceIds = new Map<string, string>(); // field id → short key
-    for (const def of fieldsRes.customFields ?? []) {
-      if ((EVIDENCE_FIELD_KEYS as readonly string[]).includes(def.fieldKey)) {
-        evidenceIds.set(def.id, def.fieldKey.replace(/^opportunity\./, ""));
-      }
-    }
-
-    const files: ImportedFile[] = [];
-    let skipped = 0;
-    for (const cf of opportunity.customFields ?? []) {
-      const field = cf.id ? evidenceIds.get(cf.id) : undefined;
-      if (!field) continue;
-      for (const entry of fileEntries(cf)) {
-        if (entry.deleted === true) continue;
-        const url = typeof entry.url === "string" ? entry.url : null;
-        if (!url) continue;
-        const name =
-          typeof entry.meta?.name === "string" && entry.meta.name
-            ? entry.meta.name
-            : url.split("/").pop() || "evidence";
-        const mimetype =
-          typeof entry.meta?.mimetype === "string" ? entry.meta.mimetype : "";
-        const kind = detectKind(mimetype, name);
-        if (!kind) {
-          skipped++;
-          continue;
-        }
-        files.push({
-          url,
-          name,
-          mimetype,
-          size: typeof entry.meta?.size === "number" ? entry.meta.size : null,
-          kind,
-          field,
-        });
-      }
-    }
+    const { opportunity, files, skipped } = result;
 
     // Automated DNC check of the client's number (replaces the manual
     // checkboxes). Best-effort: a missing contact/phone or a registry failure
     // becomes a DncCheck with `error` set, so the case still starts and
     // Screen 04 reports the DNC status as unverified.
-    const dnc = await checkContactDnc(opportunity.contactId ?? null, log);
+    const dnc = await checkContactDnc(opportunity.contactId, log);
 
     // A previous agent run leaves the "AI Run Status" custom field non-empty —
     // GHL is the run database. Report it so the UI can ask before re-running.
-    const statusField = (opportunity.customFields ?? []).find(
-      (cf) => cf.id === AI_FIELD_IDS.runStatus,
+    const statusValue = customFieldString(
+      opportunity.customFields,
+      AI_FIELD_IDS.runStatus,
     );
-    const statusValue = statusField
-      ? [
-          (statusField as { fieldValueString?: unknown }).fieldValueString,
-          (statusField as { fieldValue?: unknown }).fieldValue,
-        ].find((v) => typeof v === "string" && v.trim())
-      : undefined;
-    const existingRun =
-      typeof statusValue === "string" ? { status: statusValue.trim() } : null;
+    const existingRun = statusValue ? { status: statusValue } : null;
 
     log.info("opportunity imported", {
       opportunityId,
@@ -225,9 +133,9 @@ export async function POST(request: Request) {
     return Response.json({
       opportunity: {
         id: opportunity.id,
-        name: (opportunity.name ?? "").trim() || opportunity.id,
-        status: opportunity.status ?? "unknown",
-        contactId: opportunity.contactId ?? null,
+        name: opportunity.name,
+        status: opportunity.status,
+        contactId: opportunity.contactId,
       },
       files,
       skipped,

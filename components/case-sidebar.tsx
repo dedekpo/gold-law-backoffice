@@ -34,7 +34,8 @@ export function CaseSidebar({
       <nav className="flex-1 overflow-y-auto p-2">
         {cases.length === 0 ? (
           <p className="px-3 py-6 text-center text-xs text-zinc-500 dark:text-zinc-400">
-            No cases yet. Create one from a GHL opportunity URL.
+            No cases yet. Create one from a GHL opportunity URL or uploaded
+            files.
           </p>
         ) : (
           <ul className="flex flex-col gap-1">
