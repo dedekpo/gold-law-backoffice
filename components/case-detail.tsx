@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { Case, CaseFile } from "@/lib/types";
 import { recordLabel } from "@/lib/display";
 import { buildCaseZip, caseZipFilename } from "@/lib/export";
@@ -70,6 +71,14 @@ export function CaseDetail({
           )}
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1.5">
+          {caseItem.opportunityId && (
+            <Link
+              href={`/investigation?opp=${encodeURIComponent(caseItem.opportunityId)}`}
+              className="rounded-xs border border-rule-strong px-3.5 py-1.5 text-sm font-medium text-ink transition-colors hover:bg-wash"
+            >
+              Open the investigation file
+            </Link>
+          )}
           <CaseStatusBadge caseItem={caseItem} />
           <ElapsedTimer caseItem={caseItem} />
           {fileCount > 0 && (
@@ -220,7 +229,7 @@ function InvestigationBody({ caseItem }: { caseItem: Case }) {
         </div>
       )}
       {summary ? (
-        <p className="whitespace-pre-wrap text-sm leading-6 text-zinc-700 dark:text-zinc-300">
+        <p className="break-words whitespace-pre-wrap text-sm leading-6 text-zinc-700 dark:text-zinc-300">
           {summary}
         </p>
       ) : (

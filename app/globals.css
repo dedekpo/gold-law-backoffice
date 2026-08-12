@@ -1,1 +1,83 @@
 @import "tailwindcss";
+
+/*
+ * Backoffice design tokens — the "pleading file" system introduced with the
+ * /investigation redesign. Cool limestone paper, ink text, hairline rules,
+ * and three semantic voices: stamp brick (decisions/brand rule), ledger green
+ * (confirmed), pending amber (awaiting a decision). Legacy pages still use
+ * zinc utilities; they migrate to these tokens page by page.
+ */
+
+:root {
+  color-scheme: light dark;
+
+  --paper: #f2f1ec;
+  --card: #fdfdfc;
+  --ink: #211f1c;
+  --soft: #6e6a62;
+  --faint: #9b968c;
+  --rule: #dcdad2;
+  --rule-strong: #b9b5aa;
+  --stamp: #9a3b2c;
+  --stamp-soft: #f3e4e0;
+  --ledger: #33684c;
+  --ledger-soft: #e2ece5;
+  --pending: #8f6a1d;
+  --pending-soft: #f2ead6;
+  --wash: #eceae4;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #191816;
+    --card: #211f1d;
+    --ink: #e8e6e1;
+    --soft: #a39e94;
+    --faint: #776f65;
+    --rule: #35322d;
+    --rule-strong: #4c463f;
+    --stamp: #cf7b66;
+    --stamp-soft: #3a2723;
+    --ledger: #85b795;
+    --ledger-soft: #22312a;
+    --pending: #c9a75b;
+    --pending-soft: #322b1c;
+    --wash: #26241f;
+  }
+}
+
+@theme inline {
+  --font-sans: var(--font-plex-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-serif: var(--font-plex-serif), Georgia, "Times New Roman", serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, "SF Mono", monospace;
+
+  --color-paper: var(--paper);
+  --color-card: var(--card);
+  --color-ink: var(--ink);
+  --color-soft: var(--soft);
+  --color-faint: var(--faint);
+  --color-rule: var(--rule);
+  --color-rule-strong: var(--rule-strong);
+  --color-stamp: var(--stamp);
+  --color-stamp-soft: var(--stamp-soft);
+  --color-ledger: var(--ledger);
+  --color-ledger-soft: var(--ledger-soft);
+  --color-pending: var(--pending);
+  --color-pending-soft: var(--pending-soft);
+  --color-wash: var(--wash);
+}
+
+/* Keyboard focus is always visible, in the stamp voice. */
+:focus-visible {
+  outline: 2px solid var(--stamp);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

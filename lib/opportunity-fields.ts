@@ -33,6 +33,21 @@ export const AI_FIELD_IDS = {
   reportFiles: "N9Qej6haIjauLXbpUcUL",
 } as const;
 
+/**
+ * TEXT — deep link to the app's unified investigation view for this
+ * opportunity. App-owned (not part of the AI Intake group): written whenever
+ * a run is persisted, so anyone in GHL is one click away from everything.
+ */
+export const INVESTIGATION_URL_FIELD_ID = "SOCzxGa9BPElVNiQt7bI";
+
+/** The investigation deep link for an opportunity. */
+export function investigationUrlFor(
+  baseUrl: string,
+  opportunityId: string,
+): string {
+  return `${baseUrl.replace(/\/$/, "")}/investigation?opp=${encodeURIComponent(opportunityId)}`;
+}
+
 export const RUN_STATUS = {
   found: "✅ Completed – companies found",
   none: "☑️ Completed – no company identified",

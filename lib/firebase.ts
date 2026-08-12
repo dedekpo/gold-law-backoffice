@@ -2,6 +2,8 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { cert, getApps, initializeApp, type App } from "firebase-admin/app";
 import { getFirestore, type Firestore } from "firebase-admin/firestore";
+import { getStorage } from "firebase-admin/storage";
+import type { Bucket } from "@google-cloud/storage";
 
 /**
  * Server-only Firebase Admin bootstrap. Firestore is the structured database
@@ -80,8 +82,29 @@ function app(): App {
  * domain types simply don't reach the document. */
 export function db(): Firestore {
   if (cachedDb) return cachedDb;
+  // Survive dev HMR: module state resets but the Firebase app (and its
+  // Firestore) persist, and calling settings() twice on that instance throws.
+  const g = globalThis as { __backofficeDb?: Firestore };
+  if (g.__backofficeDb) {
+    cachedDb = g.__backofficeDb;
+    return cachedDb;
+  }
   cachedDb = getFirestore(app());
-  // Must be configured before the first operation on this instance.
-  cachedDb.settings({ ignoreUndefinedProperties: true });
+  // Must be configured before the first operation on this instance. A second
+  // settings() call throws — reachable in dev when Turbopack instantiates
+  // this module in a graph whose globalThis guard predates the instance (the
+  // underlying Firestore is the same, already-configured object), so a
+  // "settings() already called" failure is safe to swallow.
+  try {
+    cachedDb.settings({ ignoreUndefinedProperties: true });
+  } catch {
+    // Already configured with the same values by a previous module instance.
+  }
+  g.__backofficeDb = cachedDb;
   return cachedDb;
+}
+
+/** The default Storage bucket — canonical home for investigation evidence. */
+export function bucket(): Bucket {
+  return getStorage(app()).bucket();
 }

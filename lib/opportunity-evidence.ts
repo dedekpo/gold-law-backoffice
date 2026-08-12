@@ -14,6 +14,20 @@ export const EVIDENCE_FIELD_KEYS = [
   "opportunity.violation_audio_files",
 ] as const;
 
+/**
+ * Every upload field that can hold investigation-relevant files — the AI's
+ * evidence fields plus prequalified evidence and the per-company consumer
+ * complaint screenshots. Used by the unified investigation view; the AI agent
+ * keeps reading only EVIDENCE_FIELD_KEYS.
+ */
+export const ALL_EVIDENCE_FIELD_KEYS = [
+  ...EVIDENCE_FIELD_KEYS,
+  "opportunity.prequalified_screenshots",
+  "opportunity.if_yes_attach_screen_shots_of_complaints",
+  "opportunity.if_yes_attach_screen_shots_of_complaints_for_second_company",
+  "opportunity.if_yes_attach_screen_shots_of_complaints_for_third_company",
+] as const;
+
 type RawFileEntry = {
   url?: unknown;
   deleted?: unknown;
@@ -39,6 +53,15 @@ export type EvidenceFile = {
   field: string;
 };
 
+/** One opportunity custom-field definition (id ↔ key ↔ display name). */
+export type CustomFieldDef = {
+  id: string;
+  /** Full key, e.g. "opportunity.violation_screenshots". */
+  fieldKey: string;
+  name: string;
+  dataType: string | null;
+};
+
 export type OpportunityWithEvidence = {
   opportunity: {
     id: string;
@@ -52,6 +75,8 @@ export type OpportunityWithEvidence = {
   files: EvidenceFile[];
   /** Files in the evidence fields whose type we don't handle (not audio/image). */
   skipped: number;
+  /** Every opportunity custom-field definition of the location. */
+  fieldDefs: CustomFieldDef[];
 };
 
 function fileEntries(raw: RawCustomFieldValue): RawFileEntry[] {
@@ -59,6 +84,46 @@ function fileEntries(raw: RawCustomFieldValue): RawFileEntry[] {
     if (Array.isArray(candidate)) return candidate as RawFileEntry[];
   }
   return [];
+}
+
+/**
+ * Human-readable value of any non-file custom field: strings verbatim,
+ * option arrays joined. File arrays and structured values (TEXTBOX_LIST)
+ * return null — they are not display text.
+ */
+export function customFieldDisplayValue(
+  customFields: RawCustomFieldValue[],
+  fieldId: string,
+): string | null {
+  const cf = customFields.find((entry) => entry.id === fieldId);
+  if (!cf) return null;
+  for (const v of [cf.fieldValueString, cf.fieldValue, cf.fieldValueArray, cf.value]) {
+    if (typeof v === "string" && v.trim()) return v.trim();
+    if (typeof v === "number") return String(v);
+    if (Array.isArray(v) && v.every((item) => typeof item === "string")) {
+      const joined = (v as string[]).filter((s) => s.trim()).join(", ");
+      if (joined) return joined;
+    }
+  }
+  return null;
+}
+
+/** Raw file entries (url + metadata) of a FILE_UPLOAD custom field. */
+export function customFieldFiles(
+  customFields: RawCustomFieldValue[],
+  fieldId: string,
+): Array<{ url: string; name: string }> {
+  const cf = customFields.find((entry) => entry.id === fieldId);
+  if (!cf) return [];
+  return fileEntries(cf)
+    .filter((entry) => entry.deleted !== true && typeof entry.url === "string")
+    .map((entry) => ({
+      url: entry.url as string,
+      name:
+        typeof entry.meta?.name === "string" && entry.meta.name
+          ? entry.meta.name
+          : (entry.url as string).split("/").pop() || "file",
+    }));
 }
 
 /** First non-empty string value of an opportunity custom field, if any. */
@@ -81,6 +146,7 @@ export function customFieldString(
  */
 export async function fetchOpportunityWithEvidence(
   opportunityId: string,
+  evidenceKeys: readonly string[] = EVIDENCE_FIELD_KEYS,
 ): Promise<OpportunityWithEvidence | null> {
   const [oppRes, fieldsRes] = await Promise.all([
     ghlFetch<{
@@ -95,16 +161,25 @@ export async function fetchOpportunityWithEvidence(
       };
     }>(`/opportunities/${opportunityId}`),
     ghlFetch<{
-      customFields?: { id: string; fieldKey: string; dataType?: string }[];
+      customFields?: { id: string; fieldKey: string; name?: string; dataType?: string }[];
     }>(`/locations/${ghlLocationId()}/customFields?model=opportunity`),
   ]);
 
   const opportunity = oppRes.opportunity;
   if (!opportunity?.id) return null;
 
+  const fieldDefs: CustomFieldDef[] = (fieldsRes.customFields ?? []).map(
+    (def) => ({
+      id: def.id,
+      fieldKey: def.fieldKey,
+      name: def.name ?? def.fieldKey,
+      dataType: def.dataType ?? null,
+    }),
+  );
+
   const evidenceIds = new Map<string, string>(); // field id → short key
-  for (const def of fieldsRes.customFields ?? []) {
-    if ((EVIDENCE_FIELD_KEYS as readonly string[]).includes(def.fieldKey)) {
+  for (const def of fieldDefs) {
+    if (evidenceKeys.includes(def.fieldKey)) {
       evidenceIds.set(def.id, def.fieldKey.replace(/^opportunity\./, ""));
     }
   }
@@ -153,5 +228,6 @@ export async function fetchOpportunityWithEvidence(
     },
     files,
     skipped,
+    fieldDefs,
   };
 }

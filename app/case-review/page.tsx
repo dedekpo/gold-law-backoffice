@@ -1,11 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { amrToWavBlob, isAmr } from "@/lib/audio";
+import { buildDisplayFiles, caseFromRun } from "@/lib/case-display";
 import type { Case, CaseFile } from "@/lib/types";
 import type { CaseDoc } from "@/lib/case-store";
-import type { EvidenceFile } from "@/lib/opportunity-evidence";
 import type { QueueEntry } from "@/app/api/review-queue/route";
+import type { InvestigationQueueEntry } from "@/app/api/investigation/review-queue/route";
 import type { ReviewCaseResponse } from "@/app/api/review-queue/case/route";
 import { CaseDetail } from "@/components/case-detail";
 import { FileModal, FileThumbnail } from "@/components/evidence";
@@ -34,106 +34,12 @@ type LoadedCase = {
   files: CaseFile[];
 };
 
-const proxied = (url: string) =>
-  `/api/opportunity/file?url=${encodeURIComponent(url)}`;
-
-/**
- * Turn the stored run's evidence + the live GHL field values into playable /
- * viewable CaseFiles. Live URLs win (stored ones can go stale); stored text
- * and forensics ride along. Audio is downloaded eagerly because voicemails
- * arrive as AMR more often than not and need decoding before <audio> can
- * play them.
- */
-async function buildDisplayFiles(
-  stored: NonNullable<CaseDoc["run"]>["files"] | undefined,
-  live: EvidenceFile[],
-): Promise<CaseFile[]> {
-  const liveByName = new Map(live.map((f) => [f.name, f] as const));
-  const merged: Array<{
-    name: string;
-    kind: CaseFile["kind"];
-    url: string | null;
-    text?: string;
-    forensics?: CaseFile["forensics"];
-  }> = [];
-
-  const seen = new Set<string>();
-  for (const f of stored ?? []) {
-    seen.add(f.name);
-    merged.push({
-      name: f.name,
-      kind: f.kind,
-      url: liveByName.get(f.name)?.url ?? f.ghlUrl,
-      text: f.text ?? undefined,
-      forensics: f.forensics ?? undefined,
-    });
-  }
-  for (const f of live) {
-    if (seen.has(f.name)) continue;
-    merged.push({ name: f.name, kind: f.kind, url: f.url });
-  }
-
-  return Promise.all(
-    merged.map(async (f, i): Promise<CaseFile> => {
-      let url = f.url ? proxied(f.url) : "";
-      if (f.url && f.kind === "audio") {
-        try {
-          const blob = await fetch(url).then((r) => {
-            if (!r.ok) throw new Error(`download failed: ${r.status}`);
-            return r.blob();
-          });
-          const playable = isAmr(blob, f.name) ? await amrToWavBlob(blob) : blob;
-          url = URL.createObjectURL(playable);
-        } catch {
-          // Keep the proxy URL; the <audio> element will surface the failure.
-        }
-      }
-      return {
-        id: `${i}-${f.name}`,
-        name: f.name,
-        kind: f.kind,
-        url,
-        status: f.url ? "done" : "error",
-        error: f.url ? undefined : "File no longer attached to the opportunity",
-        text: f.text,
-        forensics: f.forensics,
-        forensicsStatus: f.forensics ? "done" : undefined,
-      };
-    }),
-  );
-}
-
-/** Rebuild a renderable Case from the stored structured run. */
-function caseFromRun(
-  opportunityId: string,
-  doc: CaseDoc,
-  files: CaseFile[],
-): Case | null {
-  const run = doc.run;
-  if (!run) return null;
-  return {
-    id: opportunityId,
-    name: run.caseName || doc.opportunity.name,
-    createdAt: run.createdAt,
-    completedAt: run.completedAt ?? undefined,
-    files,
-    dnc: run.dnc ?? undefined,
-    opportunityId,
-    facts: run.facts ?? undefined,
-    gate: run.gate ?? undefined,
-    screeningStatus: "done",
-    defendantStatus: run.gate?.declined ? "idle" : "done",
-    defendants: run.defendants,
-    defendantSosError: run.defendantSosError ?? undefined,
-    defendantUnmatchedSos: run.defendantUnmatchedSos,
-    defendantSearchTerms: run.defendantSearchTerms,
-    defendantInvestigation: run.defendantInvestigation ?? undefined,
-  };
-}
-
 export default function CaseReviewPage() {
   const [queue, setQueue] = useState<QueueResponse | null>(null);
   const [queueError, setQueueError] = useState<string | null>(null);
+  const [invQueue, setInvQueue] = useState<InvestigationQueueEntry[] | null>(
+    null,
+  );
   const [index, setIndex] = useState(0);
   // Loaded case + load error are tagged with the opportunity id they belong
   // to; "loading" is derived (current case has neither), so switching cases
@@ -194,6 +100,24 @@ export default function CaseReviewPage() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadQueue();
   }, [loadQueue]);
+
+  // Investigations awaiting review (Phase 4 convergence): shown above the GHL
+  // case queue; each links to its investigation view, where the reviewer
+  // approves by splitting, sends back, or closes. Best-effort — a failure
+  // here must not take the case queue down with it.
+  useEffect(() => {
+    void (async () => {
+      try {
+        const res = await fetch("/api/investigation/review-queue");
+        const data = (await res.json().catch(() => null)) as {
+          entries?: InvestigationQueueEntry[];
+        } | null;
+        if (res.ok && data?.entries) setInvQueue(data.entries);
+      } catch {
+        // Section simply stays hidden.
+      }
+    })();
+  }, []);
 
   // Revoke decoded-audio object URLs when the page unmounts.
   useEffect(() => {
@@ -305,6 +229,33 @@ export default function CaseReviewPage() {
           </p>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto">
+          {invQueue && invQueue.length > 0 && (
+            <div className="border-b border-zinc-200 dark:border-zinc-800">
+              <p className="px-4 pt-3 pb-1 text-[10px] uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                Investigations · {invQueue.length} ready for review
+              </p>
+              <ul>
+                {invQueue.map((entry) => (
+                  <li key={entry.investigationId}>
+                    <a
+                      href={`/investigation?opp=${encodeURIComponent(entry.opportunityId)}`}
+                      className="flex flex-col gap-0.5 border-b border-zinc-100 px-4 py-3 transition-colors last:border-b-0 hover:bg-zinc-50 dark:border-zinc-900 dark:hover:bg-zinc-900/50"
+                    >
+                      <span className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                        {entry.opportunityName}
+                      </span>
+                      <span className="text-[11px] text-zinc-500 dark:text-zinc-400">
+                        {entry.confirmedCompanies}/{entry.companies} companies
+                        confirmed · {entry.confirmedViolations} violation
+                        {entry.confirmedViolations === 1 ? "" : "s"} ·{" "}
+                        {entry.evidence} file{entry.evidence === 1 ? "" : "s"}
+                      </span>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           {queueError && (
             <div className="p-4">
               <p className="text-sm text-red-600 dark:text-red-400">

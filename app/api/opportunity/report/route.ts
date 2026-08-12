@@ -2,9 +2,18 @@ import { z } from "zod";
 import type { CaseRunSnapshot } from "@/lib/case-snapshot";
 import { saveRun, type StoredEvidenceFile } from "@/lib/case-store";
 import { GhlError, ghlFetch, ghlUploadCustomFieldFile } from "@/lib/ghl";
+import {
+  moveOpportunityToStage,
+  resolveQueueStage,
+} from "@/lib/investigation-queue";
 import { createLogger, nextRequestId } from "@/lib/logger";
 import { fetchOpportunityWithEvidence } from "@/lib/opportunity-evidence";
-import { AI_FIELD_IDS, RUN_STATUS } from "@/lib/opportunity-fields";
+import {
+  AI_FIELD_IDS,
+  INVESTIGATION_URL_FIELD_ID,
+  investigationUrlFor,
+  RUN_STATUS,
+} from "@/lib/opportunity-fields";
 
 const baseLog = createLogger("opportunity-report");
 
@@ -125,6 +134,16 @@ export async function POST(request: Request) {
             field_value: values.investigationNotes,
           },
           {
+            // Deep link into the app's unified view. APP_BASE_URL pins the
+            // production origin so a run from a dev machine can't write a
+            // localhost link onto a real opportunity.
+            id: INVESTIGATION_URL_FIELD_ID,
+            field_value: investigationUrlFor(
+              process.env.APP_BASE_URL ?? new URL(request.url).origin,
+              opportunityId,
+            ),
+          },
+          {
             id: AI_FIELD_IDS.reportFiles,
             field_value: [
               {
@@ -160,7 +179,40 @@ export async function POST(request: Request) {
       }
     }
 
-    return Response.json({ ok: true, dbSaved });
+    // Route the outcome: a run that found NO company hands the file straight
+    // to the human investigators ('🔍 Manual Investigation') — that stage's
+    // whole job is finding what the agent couldn't, and without this move the
+    // opportunity would strand in 'AI Under Investigation'. Runs that found
+    // companies stay put for the review desk to split; declined runs stay put
+    // too (no decline stage exists in the current flow). Best-effort: a
+    // failed move never fails the save, and the guard keeps the PUT from
+    // dragging an opportunity out of another pipeline.
+    let movedToManual = false;
+    if (values.runStatus === RUN_STATUS.none) {
+      try {
+        const stage = await resolveQueueStage("manual");
+        const opp = await ghlFetch<{
+          opportunity?: { pipelineId?: string };
+        }>(`/opportunities/${opportunityId}`);
+        if (opp.opportunity?.pipelineId === stage.pipelineId) {
+          await moveOpportunityToStage(opportunityId, stage);
+          movedToManual = true;
+          log.info("no company found — moved to Manual Investigation", {
+            opportunityId,
+          });
+        } else {
+          log.warn("manual-stage move skipped — different pipeline", {
+            opportunityId,
+            pipelineId: opp.opportunity?.pipelineId ?? null,
+          });
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        log.warn("manual-stage move failed", { opportunityId, message });
+      }
+    }
+
+    return Response.json({ ok: true, dbSaved, movedToManual });
   } catch (err) {
     if (err instanceof GhlError && err.status === 404) {
       return Response.json(
