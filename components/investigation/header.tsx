@@ -30,7 +30,18 @@ const OUTCOME_LABELS: Record<InvestigationOutcome, string> = {
   converted: "Converted to case(s)",
   no_company_found: "No company found",
   no_violation: "No violation",
-  declined: "Declined",
+  declined: "Not a fit",
+};
+
+/** Where closing parks the intake opportunity, by outcome — mirrors the
+ * server's CLOSE_STAGE_NAMES (app/api/investigation/status). */
+const CLOSE_STAGE_LABELS: Record<
+  Exclude<InvestigationOutcome, "converted">,
+  string
+> = {
+  no_company_found: "No Company ID – Notify Lead",
+  no_violation: "No Case Leads",
+  declined: "Not a Fit",
 };
 
 export function statusStamp(inv: InvestigationDoc): {
@@ -257,20 +268,13 @@ function Actions({
 
   if (activeInv.status === "open") {
     return (
-      <div className="mt-4 flex flex-wrap items-center gap-3">
-        <Btn
-          variant="primary"
-          disabled={!ready}
-          onClick={() => transition(activeInv, { action: "submit" })}
-        >
-          {busy === "status" ? "Submitting…" : "Submit for review"}
-        </Btn>
-        <span className="text-xs text-soft">
-          {needName
-            ? "Enter your name first — every entry on the file is attributed."
-            : "Done digging? This hands the file to the reviewer."}
-        </span>
-      </div>
+      <OpenBench
+        inv={activeInv}
+        ready={ready}
+        needName={needName}
+        busy={busy}
+        transition={transition}
+      />
     );
   }
 
@@ -317,6 +321,61 @@ function StartButton({
   );
 }
 
+/** The investigator's bench: submit for review, or close a dead-end file. */
+function OpenBench({
+  inv,
+  ready,
+  needName,
+  busy,
+  transition,
+}: {
+  inv: InvestigationDoc;
+  ready: boolean;
+  needName: boolean;
+  busy: string | null;
+  transition: (
+    inv: InvestigationDoc,
+    body: Record<string, unknown>,
+    after?: () => void,
+  ) => void;
+}) {
+  const [closing, setClosing] = useState(false);
+  return (
+    <div className="mt-4">
+      <div className="flex flex-wrap items-center gap-3">
+        <Btn
+          variant="primary"
+          disabled={!ready}
+          onClick={() => transition(inv, { action: "submit" })}
+        >
+          {busy === "status" ? "Submitting…" : "Submit for review"}
+        </Btn>
+        <span className="flex-1 text-xs text-soft">
+          {needName
+            ? "Enter your name first — every entry on the file is attributed."
+            : "Done digging? This hands the file to the reviewer."}
+        </span>
+        <Btn
+          small
+          variant="danger"
+          disabled={!ready}
+          onClick={() => setClosing(!closing)}
+        >
+          Close — no case…
+        </Btn>
+      </div>
+      {closing && (
+        <ClosePanel
+          inv={inv}
+          ready={ready}
+          transition={transition}
+          onDone={() => setClosing(false)}
+        />
+      )}
+    </div>
+  );
+}
+
 function ReviewBench({
   inv,
   ready,
@@ -332,9 +391,6 @@ function ReviewBench({
 }) {
   const [mode, setMode] = useState<"idle" | "send_back" | "close">("idle");
   const [note, setNote] = useState("");
-  const [outcome, setOutcome] = useState<
-    "no_company_found" | "no_violation" | "declined"
-  >("no_company_found");
   const reset = () => {
     setMode("idle");
     setNote("");
@@ -368,50 +424,96 @@ function ReviewBench({
           Close — no case…
         </Btn>
       </div>
-      {mode !== "idle" && (
+      {mode === "send_back" && (
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          {mode === "close" && (
-            <select
-              value={outcome}
-              onChange={(e) => setOutcome(e.target.value as typeof outcome)}
-              className={`${inputCls} py-1 text-xs`}
-            >
-              <option value="no_company_found">No company found</option>
-              <option value="no_violation">No violation</option>
-              <option value="declined">Declined — other reason</option>
-            </select>
-          )}
           <input
             value={note}
             onChange={(e) => setNote(e.target.value)}
-            placeholder={
-              mode === "send_back"
-                ? "What still needs digging? (required)"
-                : "Note for the record (optional)"
-            }
+            placeholder="What still needs digging? (required)"
             className={`${inputCls} min-w-64 flex-1`}
           />
           <Btn
-            variant={mode === "close" ? "danger" : "primary"}
-            disabled={!ready || (mode === "send_back" && note.trim().length === 0)}
+            variant="primary"
+            disabled={!ready || note.trim().length === 0}
             onClick={() =>
-              transition(
-                inv,
-                mode === "send_back"
-                  ? { action: "send_back", note: note.trim() }
-                  : {
-                      action: "close",
-                      outcome,
-                      ...(note.trim() ? { note: note.trim() } : {}),
-                    },
-                reset,
-              )
+              transition(inv, { action: "send_back", note: note.trim() }, reset)
             }
           >
-            {mode === "send_back" ? "Send back" : "Close investigation"}
+            Send back
           </Btn>
         </div>
       )}
+      {mode === "close" && (
+        <ClosePanel inv={inv} ready={ready} transition={transition} onDone={reset} />
+      )}
+    </div>
+  );
+}
+
+/**
+ * The no-case close: reason first, because the reason decides where the
+ * opportunity is parked in GHL — no more dragging cards after the fact.
+ */
+function ClosePanel({
+  inv,
+  ready,
+  transition,
+  onDone,
+}: {
+  inv: InvestigationDoc;
+  ready: boolean;
+  transition: (
+    inv: InvestigationDoc,
+    body: Record<string, unknown>,
+    after?: () => void,
+  ) => void;
+  onDone: () => void;
+}) {
+  const [note, setNote] = useState("");
+  const [outcome, setOutcome] = useState<
+    "no_company_found" | "no_violation" | "declined"
+  >("no_company_found");
+
+  return (
+    <div className="mt-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <select
+          value={outcome}
+          onChange={(e) => setOutcome(e.target.value as typeof outcome)}
+          className={`${inputCls} py-1 text-xs`}
+        >
+          <option value="no_company_found">No company found</option>
+          <option value="no_violation">No violations found</option>
+          <option value="declined">Not a fit</option>
+        </select>
+        <input
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          placeholder="Note for the record (optional)"
+          className={`${inputCls} min-w-64 flex-1`}
+        />
+        <Btn
+          variant="danger"
+          disabled={!ready}
+          onClick={() =>
+            transition(
+              inv,
+              {
+                action: "close",
+                outcome,
+                ...(note.trim() ? { note: note.trim() } : {}),
+              },
+              onDone,
+            )
+          }
+        >
+          Close investigation
+        </Btn>
+      </div>
+      <p className="mt-1.5 font-mono text-[11px] text-soft">
+        Closing moves the opportunity to &ldquo;{CLOSE_STAGE_LABELS[outcome]}
+        &rdquo; in GHL.
+      </p>
     </div>
   );
 }

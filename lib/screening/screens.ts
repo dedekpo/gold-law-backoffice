@@ -7,6 +7,7 @@ import {
   type KillCheck,
   type ScreenResult,
 } from "@/lib/types";
+import { contactFiles } from "./contacts";
 
 const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
 
@@ -38,6 +39,15 @@ function localHour(ts: string | null): number | null {
 
 const inQuietWindow = (hour: number): boolean => hour < 8 || hour >= 21;
 
+/**
+ * Distinct source files of the contacts proving a hit, in evidence order.
+ * A contact carries every file the message appears in (screenshot AND its
+ * audio twin), so the proof includes the recording, not just the screenshot.
+ */
+const proofFiles = (contacts: ExtractedContact[]): string[] => [
+  ...new Set(contacts.flatMap(contactFiles)),
+];
+
 // --- Screen 01 — Prerecorded Voice -----------------------------------------
 function screenPrerecorded(contacts: ExtractedContact[]): ScreenResult {
   const hits = contacts.filter(
@@ -60,6 +70,7 @@ function screenPrerecorded(contacts: ExtractedContact[]): ScreenResult {
     hit: true,
     track: "tcpa",
     basis: `Pre-recorded/artificial voicemail (${file}). A single prerecorded voicemail is the violation.`,
+    evidence_files: proofFiles(hits),
   };
 }
 
@@ -117,6 +128,8 @@ function screenFailureToStop(contacts: ExtractedContact[]): ScreenResult {
       basis: `Opt-out then a marketing ${marketing.channel} after it${
         buffered ? " (>24h later)" : ""
       } (${marketing.file}). Internal DNC / failure to stop.`,
+      // Both halves of the violation: the STOP and the contact that ignored it.
+      evidence_files: proofFiles([stopContact, marketing]),
     };
   }
   const debtText = followups.find(
@@ -130,6 +143,7 @@ function screenFailureToStop(contacts: ExtractedContact[]): ScreenResult {
       basis: `Opt-out then a debt-collection text after it${
         buffered ? " (>24h later)" : ""
       } (${debtText.file}). Debt collection violation — routed to the FDCPA/Florida track, not TCPA-scored.`,
+      evidence_files: proofFiles([stopContact, debtText]),
     };
   }
   return none;
@@ -161,6 +175,7 @@ function screenQuietHours(contacts: ExtractedContact[]): ScreenResult {
     hit: true,
     track: "tcpa",
     basis: `${quiet.length} marketing contacts between 9PM and 8AM (local time).`,
+    evidence_files: proofFiles(quiet),
   };
 }
 
@@ -174,9 +189,10 @@ function screenDnc(
   contacts: ExtractedContact[],
   dnc: DncCheck | undefined,
 ): ScreenResult {
-  const telemarketing = contacts.filter(
+  const telemarketingContacts = contacts.filter(
     (c) => c.direction !== "from_consumer" && c.messageType === "marketing",
-  ).length;
+  );
+  const telemarketing = telemarketingContacts.length;
   if (telemarketing === 0) {
     return {
       screen: "dnc_registry",
@@ -213,6 +229,9 @@ function screenDnc(
       track: "tcpa",
       dncTiers: tiers,
       basis: `${parts.join("; ")}.`,
+      // The registry hit itself comes from the lookup; the files prove the
+      // telemarketing contacts the claim counts.
+      evidence_files: proofFiles(telemarketingContacts),
     };
   }
   // Inconclusive = a registry we still care about could not be consulted.

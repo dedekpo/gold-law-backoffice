@@ -15,9 +15,9 @@ import { joinAddress, recordLabel } from "@/lib/display";
 import { getJob, startJob } from "@/lib/jobs";
 import { type Logger, createLogger, nextRequestId } from "@/lib/logger";
 import { isRateLimitError } from "@/lib/rate-limit";
+import { contactMatchesFiles, mergeContacts } from "@/lib/screening";
 import { assessCompany } from "@/lib/scoring/assess";
 import type {
-  ExtractedContact,
   ScreenResult,
   Scorecard,
   Track,
@@ -707,7 +707,10 @@ async function runInvestigation(
           }
         }
         // Prefer the enrichment's own file attribution; otherwise fall back to the
-        // whole case only when this is the sole company.
+        // whole case only when this is the sole company. The fallback is
+        // DISPLAY-ONLY attribution ("don't hide the proof"): screening must
+        // never run over files nobody tied to the company, or another
+        // spammer's messages in a mixed pile would pin violations on it.
         const attributed = (enrichment?.evidence_files ?? []).filter((name) =>
           knownFileNames.has(name),
         );
@@ -716,38 +719,43 @@ async function runInvestigation(
           : soleCompany
             ? allFileNames
             : [];
-        return synthesizeCandidateFromSos(
-          records,
-          evidenceFileNames,
-          flOutcomeByName,
-          enrichment,
-        );
+        return {
+          candidate: synthesizeCandidateFromSos(
+            records,
+            evidenceFileNames,
+            flOutcomeByName,
+            enrichment,
+          ),
+          screeningFiles: attributed,
+        };
       }),
     );
-    const allCandidates = [...candidatesWithSos, ...synthesizedCandidates];
+    // Each candidate paired with the files screening may trust: the explicit
+    // content-based attribution only, never the sole-company display fallback.
+    const allCandidates = [
+      ...candidatesWithSos.map((candidate) => ({
+        candidate,
+        screeningFiles: candidate.evidence_files,
+      })),
+      ...synthesizedCandidates,
+    ];
 
     // Per-company screening + scoring. Merge the audio forensics hint into the
-    // extracted contacts (so Screen 01 is grounded in the acoustic analysis),
-    // then assess each company against ONLY its attributed evidence.
+    // extracted contacts (so Screen 01 is grounded in the acoustic analysis)
+    // and order them into the thread timeline (Screen 02 depends on "STOP then
+    // a later contact" being ordered), then assess each company against ONLY
+    // its attributed evidence. Same shared helpers the UI uses to re-derive
+    // per-screen proof from a stored run, so the two always agree.
     const rawContacts = facts?.contacts ?? [];
     const prerecordedFiles = new Set(
       files.filter((f) => f.forensics?.is_likely_prerecorded).map((f) => f.name),
     );
-    // Normalize and put contacts in one chronological order (by `sequence`, with
-    // extraction order as a stable fallback) so per-company screens see the thread
-    // timeline — Screen 02 depends on "STOP then a later contact" being ordered.
-    const mergedContacts: ExtractedContact[] = rawContacts
-      .map((c, i) => ({
-        ...c,
-        sequence: c.sequence ?? i,
-        timestampInferred: c.timestampInferred ?? c.timestamp === null,
-        isPrerecorded: prerecordedFiles.has(c.file) ? true : c.isPrerecorded,
-      }))
-      .sort((a, b) => a.sequence - b.sequence);
+    const mergedContacts = mergeContacts(rawContacts, prerecordedFiles);
     const scoredCandidates: CandidateWithSos[] = allCandidates.map(
-      (candidate) => {
+      ({ candidate, screeningFiles }) => {
+        const attributedSet = new Set(screeningFiles);
         const companyContacts = mergedContacts.filter((c) =>
-          candidate.evidence_files.includes(c.file),
+          contactMatchesFiles(c, attributedSet),
         );
         const assessment = assessCompany(candidate, companyContacts, { dnc });
         return {

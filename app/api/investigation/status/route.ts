@@ -1,7 +1,14 @@
 import { z } from "zod";
 import { createContactNote } from "@/lib/contact-notes";
+import { ghlFetch } from "@/lib/ghl";
+import {
+  moveOpportunityToStage,
+  resolveIntakeStage,
+  type QueueStage,
+} from "@/lib/investigation-queue";
 import {
   appendLogEntry,
+  getInvestigation,
   mutateInvestigation,
   type InvestigationOutcome,
 } from "@/lib/investigation-store";
@@ -20,11 +27,26 @@ const baseLog = createLogger("investigation-status");
  * executing the split (POST /api/investigation/split), which records the
  * review decision and closes the doc as "converted".
  *
- * Closing does NOT move the intake opportunity in GHL: there is no terminal
- * "declined" stage in pipeline 01, and inventing stage moves is not this
- * route's call. Every transition writes a log entry, mirrored to the
+ * Closing DOES retire the intake opportunity in GHL: each no-case outcome has
+ * a terminal stage in pipeline 01 (see CLOSE_STAGE_NAMES), mirroring how the
+ * split retires a converted parent to "Converted to Case(s)". The move runs
+ * BEFORE the doc is closed so a GHL failure leaves everything retryable, and
+ * is skipped (never forced) when the opportunity has already left the intake
+ * pipeline. Reopening does not move the opportunity back — undoing a drag is
+ * a human call. Every transition writes a log entry, mirrored to the
  * contact's GHL notes by default.
  */
+
+/** Where a closed intake opportunity is parked, by outcome. Matched by
+ * normalized name, so the emoji/dash cosmetics in GHL don't matter. */
+const CLOSE_STAGE_NAMES: Record<
+  Exclude<InvestigationOutcome, "converted">,
+  string
+> = {
+  no_company_found: "No Company ID – Notify Lead",
+  no_violation: "☹️ No Case Leads",
+  declined: "⛔ Not a Fit",
+};
 
 const bodySchema = z.object({
   investigationId: z.string().min(1),
@@ -40,7 +62,7 @@ const OUTCOME_LABELS: Record<InvestigationOutcome, string> = {
   converted: "converted to case(s)",
   no_company_found: "no company found",
   no_violation: "no violation",
-  declined: "declined",
+  declined: "not a fit",
 };
 
 export async function POST(request: Request) {
@@ -67,6 +89,40 @@ export async function POST(request: Request) {
   const now = new Date().toISOString();
 
   try {
+    // Closing retires the intake opportunity to the outcome's terminal stage.
+    // Resolve + move BEFORE closing the doc: the PUT is idempotent, so a
+    // failure anywhere leaves the investigation open and the close retryable.
+    let closedStage: QueueStage | null = null;
+    let moveSkipped: string | null = null;
+    if (action === "close") {
+      const current = await getInvestigation(investigationId);
+      if (!current) {
+        return Response.json(
+          { error: "Investigation not found." },
+          { status: 409 },
+        );
+      }
+      if (current.status === "closed") {
+        return Response.json(
+          { error: "This investigation is already closed." },
+          { status: 409 },
+        );
+      }
+      const stage = await resolveIntakeStage(CLOSE_STAGE_NAMES[outcome!]);
+      // Guard: only move an opportunity that still lives in the intake
+      // pipeline — a PUT would otherwise drag it out of another pipeline.
+      const live = await ghlFetch<{
+        opportunity?: { pipelineId?: string };
+      }>(`/opportunities/${current.source.opportunityId}`);
+      if (live.opportunity?.pipelineId === stage.pipelineId) {
+        await moveOpportunityToStage(current.source.opportunityId, stage);
+        closedStage = stage;
+      } else {
+        moveSkipped =
+          "the opportunity is no longer in the intake pipeline, so it was not moved";
+      }
+    }
+
     let logLine = "";
     const doc = await mutateInvestigation(investigationId, (d) => {
       const expect = (allowed: string[]) => {
@@ -92,7 +148,23 @@ export async function POST(request: Request) {
           expect(["open", "ready_for_review"]);
           d.status = "closed";
           d.outcome = outcome!;
-          logLine = `Closed — ${OUTCOME_LABELS[outcome!]}.${trimmed ? `\n${trimmed}` : ""}`;
+          if (closedStage) {
+            // A no-case close is the reviewer's terminal decision — record it
+            // with the stage move, same shape the split writes for approvals.
+            d.review = {
+              decision: "declined",
+              decidedAt: now,
+              movedToStageId: closedStage.stageId,
+              movedToStageName: closedStage.stageName,
+            };
+          }
+          logLine = `Closed — ${OUTCOME_LABELS[outcome!]}.${
+            closedStage
+              ? ` Moved the opportunity to "${closedStage.stageName}".`
+              : moveSkipped
+                ? ` (${moveSkipped}.)`
+                : ""
+          }${trimmed ? `\n${trimmed}` : ""}`;
           break;
         case "reopen":
           expect(["closed"]);
@@ -133,8 +205,20 @@ export async function POST(request: Request) {
       }
     }
 
-    log.info("status transition", { investigationId, action, outcome, mirrored });
-    return Response.json({ doc, mirrored });
+    log.info("status transition", {
+      investigationId,
+      action,
+      outcome,
+      mirrored,
+      movedToStage: closedStage?.stageName ?? null,
+    });
+    return Response.json({
+      doc,
+      mirrored,
+      movedToStage: closedStage
+        ? { id: closedStage.stageId, name: closedStage.stageName }
+        : null,
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     const known =

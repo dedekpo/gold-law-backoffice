@@ -19,7 +19,21 @@ const contactSchema = z.object({
   file: z
     .string()
     .describe(
-      "Exact filename from this contact's '### File N — … — <filename>' header.",
+      "Exact filename from this contact's '### File N — … — <filename>' header. " +
+        "When the message appears in several files, use the one showing the most " +
+        "detail (usually the screenshot with the timestamp and sender number).",
+    ),
+  files: z
+    .array(z.string())
+    .describe(
+      "EVERY file this exact message appears in, filenames copied verbatim from " +
+        "the '### File N — … — <filename>' headers, `file` included. The same " +
+        "voicemail often exists as BOTH a screenshot (visual voicemail with " +
+        "caller id + timestamp) and an audio recording of it, and overlapping " +
+        "screenshots can show the same message twice — extract the message ONCE " +
+        "but list every file it appears in here, so the audio proof is never " +
+        "lost. Match audio to a screenshot only when the content clearly matches " +
+        "(same script/greeting/company).",
     ),
   sequence: z
     .number()
@@ -173,8 +187,11 @@ function buildContent(files: ExtractFile[]): UserContentPart[] {
         "sender numbers, every timestamp, message order, and any STOP/opt-out text. " +
         "Multiple screenshots often overlap and show the SAME thread: extract each " +
         "distinct message ONCE and give every contact a `sequence` placing it in one " +
-        "combined oldest→newest timeline across all files. Preserve the position of " +
-        "any consumer STOP/opt-out relative to the messages around it. " +
+        "combined oldest→newest timeline across all files. The same voicemail often " +
+        "exists TWICE — as a visual-voicemail screenshot and as its audio recording: " +
+        "that is still ONE contact, but its `files` array must list BOTH filenames so " +
+        "the audio proof stays linked. Preserve the position of any consumer " +
+        "STOP/opt-out relative to the messages around it. " +
         "Extract facts only; do not score.",
     },
   ];
@@ -344,6 +361,16 @@ async function runExtraction(
     );
 
     const facts: EvidenceFacts = output;
+    // Keep only real filenames in each contact's `files` (and make sure the
+    // primary `file` is in it), so a paraphrased name never points the proof
+    // at evidence that isn't there.
+    const knownNames = new Set(files.map((f) => f.name));
+    facts.contacts = facts.contacts.map((c) => ({
+      ...c,
+      files: [...new Set([c.file, ...(c.files ?? [])])].filter((name) =>
+        knownNames.has(name),
+      ),
+    }));
     const gate = evaluateIntakeGate(facts);
     done({
       contacts: facts.contacts.length,

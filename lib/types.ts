@@ -79,6 +79,15 @@ export type ExtractedContact = {
   /** Filename of the evidence this contact came from (matches CaseFile.name). */
   file: string;
   /**
+   * EVERY file this exact message appears in — e.g. a voicemail that exists as
+   * both a screenshot (with caller id + timestamp) and its audio recording.
+   * Dedup keeps ONE contact per message, but the proof must not lose the audio
+   * twin: screens cite these files and forensics match against any of them.
+   * Includes `file`. Absent on runs stored before this field existed — read
+   * through `contactFiles()` (lib/screening), never directly.
+   */
+  files?: string[];
+  /**
    * 1-based chronological position of this message in the overall conversation
    * timeline (oldest → newest), shared across ALL files: the same message shown
    * in two overlapping screenshots gets ONE sequence. Screening relies on this
@@ -195,6 +204,13 @@ export type ScreenResult = {
   track: Track | null;
   /** Human-readable basis citing the evidence. */
   basis: string;
+  /**
+   * Exact filenames of the evidence proving THIS screen's hit (matched against
+   * CaseFile.name) — the structural counterpart of the citation in `basis`, so
+   * a violation finding can link straight to its proof. Empty/absent when the
+   * screen did not hit (or, on runs stored before this field existed, always).
+   */
+  evidence_files?: string[];
   /** Applicable but unconfirmable (e.g. DNC needs the API). MVP: Screen 04. */
   unverified?: boolean;
   /** DNC only: claim tiers unlocked by confirmed registrations (2 = FL, 4 = national). */

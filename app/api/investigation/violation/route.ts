@@ -10,10 +10,16 @@ import { createLogger, nextRequestId } from "@/lib/logger";
 const baseLog = createLogger("investigation-violation");
 
 /**
- * Add or update one violation finding (Phase 3 manual capture). Findings start
- * as "potential" and a human promotes them to "confirmed" (or dismisses them)
- * — the same ViolationFinding artifact the AI produces, so review reads one
- * list.
+ * Add or update one violation finding — manual capture and accepted AI
+ * suggestions both land here, producing the same ViolationFinding artifact so
+ * review reads one list. Findings start as "potential" and a human promotes
+ * them to "confirmed" (or dismisses them).
+ *
+ * A finding may carry `evidenceIds` — the exact screenshot/audio entries
+ * proving it. Confirming such a finding also attributes that evidence to the
+ * finding's company (role "confirmed", companyIds ∪ company), which is
+ * exactly what the split-readiness gate asks for — one click instead of
+ * hunting the proof through 50 raw exhibits.
  */
 
 const SCREEN_LABELS: Record<string, string> = {
@@ -35,6 +41,8 @@ const bodySchema = z.object({
   basis: z.string().max(5000).optional(),
   /** Company the violation is pinned to; null while unattributed. */
   companyId: z.string().min(1).nullable().optional(),
+  /** Evidence entries proving the finding (must exist on the investigation). */
+  evidenceIds: z.array(z.string().min(1)).max(100).optional(),
   status: z.enum(["potential", "confirmed", "dismissed"]).optional(),
 });
 
@@ -44,8 +52,16 @@ export async function POST(request: Request) {
   if (!parsed.success) {
     return Response.json({ error: "Invalid request body." }, { status: 400 });
   }
-  const { investigationId, actorName, violationId, screen, basis, companyId, status } =
-    parsed.data;
+  const {
+    investigationId,
+    actorName,
+    violationId,
+    screen,
+    basis,
+    companyId,
+    evidenceIds,
+    status,
+  } = parsed.data;
   if (!violationId && !screen) {
     return Response.json(
       { error: "A new finding needs a screen." },
@@ -64,6 +80,12 @@ export async function POST(request: Request) {
       ) {
         throw new Error("That company is not on this investigation.");
       }
+      if (
+        evidenceIds &&
+        !evidenceIds.every((id) => d.evidence.some((e) => e.id === id))
+      ) {
+        throw new Error("Some linked evidence is not on this investigation.");
+      }
 
       let finding: ViolationFinding | undefined = violationId
         ? d.violations.find((v) => v.id === violationId)
@@ -79,14 +101,20 @@ export async function POST(request: Request) {
           status: "potential",
           basis: (basis ?? "").trim(),
           companyId: companyId ?? null,
+          evidenceIds: evidenceIds ?? [],
           foundBy: actor,
         };
         d.violations.push(finding);
-        logLine = `Recorded potential violation: ${SCREEN_LABELS[finding.screen]}.`;
+        logLine = `Recorded potential violation: ${SCREEN_LABELS[finding.screen]}.${
+          finding.evidenceIds!.length
+            ? ` Linked ${finding.evidenceIds!.length} proof file(s).`
+            : ""
+        }`;
       } else {
         if (screen) finding.screen = screen;
         if (basis !== undefined) finding.basis = basis.trim();
         if (companyId !== undefined) finding.companyId = companyId;
+        if (evidenceIds !== undefined) finding.evidenceIds = evidenceIds;
       }
 
       if (status && status !== finding.status) {
@@ -97,6 +125,32 @@ export async function POST(request: Request) {
             : status === "dismissed"
               ? `Dismissed violation: ${SCREEN_LABELS[finding.screen]}.`
               : `Moved violation back to potential: ${SCREEN_LABELS[finding.screen]}.`;
+
+        // Confirming a finding also files its proof: the linked evidence
+        // becomes confirmed and is attributed to the finding's company, so
+        // the split gate (confirmed violation + attributed proof) is met in
+        // one motion instead of a second pass through the exhibits.
+        if (status === "confirmed" && finding.companyId) {
+          const linked = (finding.evidenceIds ?? []).filter((id) =>
+            d.evidence.some((e) => e.id === id),
+          );
+          let attributed = 0;
+          for (const e of d.evidence) {
+            if (!linked.includes(e.id)) continue;
+            e.role = "confirmed";
+            if (!e.companyIds.includes(finding.companyId)) {
+              e.companyIds.push(finding.companyId);
+            }
+            attributed++;
+          }
+          if (attributed > 0) {
+            const company = d.companies.find((c) => c.id === finding!.companyId);
+            const name = company
+              ? company.profile.legal_name || company.profile.company_name
+              : "the company";
+            logLine += ` Attributed ${attributed} proof file(s) to ${name}.`;
+          }
+        }
       }
     });
 

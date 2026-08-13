@@ -110,6 +110,12 @@ export type ViolationFinding = {
   basis: string;
   /** Company this violation is pinned to; null while unattributed. */
   companyId: string | null;
+  /**
+   * Ids of the evidence entries proving this violation — the screenshot/audio
+   * the finding rests on, so review never hunts through the raw pile.
+   * Findings written before this field existed lack it: read as `?? []`.
+   */
+  evidenceIds?: string[];
   foundBy: Actor;
 };
 
@@ -144,7 +150,7 @@ export type InvestigationOutcome =
   | "converted"
   | "no_company_found"
   | "no_violation"
-  /** Reviewer declined for another reason (e.g. time-barred, no claim). */
+  /** "Not a fit" — declined for another reason (e.g. time-barred, no claim). */
   | "declined";
 
 /** A case opportunity created at the split, with its links. */

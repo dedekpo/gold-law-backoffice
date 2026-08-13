@@ -3,3 +3,4 @@
 
 export { evaluateIntakeGate } from "./gate";
 export { runScreens, checkKillConditions, countVolume } from "./screens";
+export { contactFiles, contactMatchesFiles, mergeContacts } from "./contacts";

@@ -560,7 +560,11 @@ function FileView({ view, onReload }: { view: View; onReload: () => Promise<void
               {workbench && (
                 <>
                   <CompaniesSection data={data} runDefendants={runDefendants} />
-                  <ViolationsSection />
+                  <ViolationsSection
+                    runDefendants={runDefendants}
+                    displayCase={displayCase}
+                    onOpenEvidence={(id) => setOpenKey(`ev:${id}`)}
+                  />
                 </>
               )}
 
