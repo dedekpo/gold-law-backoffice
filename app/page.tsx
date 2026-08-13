@@ -95,6 +95,17 @@ export default function LobbyPage() {
             tally={tallies.manual}
           />
 
+          <footer className="mt-10 flex items-baseline gap-3">
+            <span className="font-mono text-[10px] tracking-[0.18em] text-faint uppercase">
+              Utilities
+            </span>
+            <Link
+              href="/amr-to-mp3"
+              className="font-mono text-[11px] text-soft underline-offset-4 hover:underline"
+            >
+              AMR → MP3 converter
+            </Link>
+          </footer>
         </div>
       </div>
     </main>

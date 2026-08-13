@@ -13,6 +13,7 @@
     "@ai-sdk/google": "^3.0.83",
     "@ai-sdk/google-vertex": "^4.0.153",
     "@audio/decode-amr": "^1.1.1",
+    "@breezystack/lamejs": "^1.2.7",
     "ai": "^6.0.208",
     "fflate": "^0.8.3",
     "firebase-admin": "^14.2.0",
