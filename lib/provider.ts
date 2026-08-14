@@ -49,10 +49,30 @@ export const anthropic = createAnthropic();
  * param is omitted). Centralised here so call sites stay provider-agnostic.
  * Note Opus 4.8 rejects sampling params (temperature/topP/topK/seed) — the
  * provider strips them with a warning, so don't set them on Claude calls.
+ *
+ * `cacheControl` turns on Anthropic's automatic prompt caching (the request
+ * top-level `cache_control` param). The biggest win is the defendant agent's
+ * tool loop: every step re-sends the SOP instructions + tools + the growing
+ * conversation, and with caching each step reads the previous step's prefix at
+ * ~0.1x input price instead of re-processing it at full price. Cache writes
+ * cost 1.25x, so unique one-shot prompts pay a small premium — the shared
+ * prefixes (system prompts, tool defs, loop history) dominate our traffic.
  */
 const claudeDefaults = defaultSettingsMiddleware({
   settings: {
-    providerOptions: { anthropic: { thinking: { type: "adaptive" } } },
+    providerOptions: {
+      anthropic: {
+        thinking: { type: "adaptive" },
+        cacheControl: { type: "ephemeral" },
+      },
+    },
+  },
+});
+
+/** Same caching default for models that must run thinking-off (see below). */
+const claudeCacheOnly = defaultSettingsMiddleware({
+  settings: {
+    providerOptions: { anthropic: { cacheControl: { type: "ephemeral" } } },
   },
 });
 
@@ -73,12 +93,9 @@ const THINKING_OFF_MODELS = new Set(["claude-sonnet-4-6"]);
 
 export function model(id: string) {
   if (id.startsWith("claude-")) {
-    if (THINKING_OFF_MODELS.has(id)) {
-      return anthropic(id);
-    }
     return wrapLanguageModel({
       model: anthropic(id),
-      middleware: claudeDefaults,
+      middleware: THINKING_OFF_MODELS.has(id) ? claudeCacheOnly : claudeDefaults,
     });
   }
   return google(id.replace(/^google\//, ""));
